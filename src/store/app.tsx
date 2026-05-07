@@ -271,16 +271,26 @@ export const AppProvider = ({ children }: { children: ReactNode }) => {
 
     // Check for an existing persisted session on startup
     (async () => {
-      const { data } = await supabase.auth.getSession();
-      if (data.session?.user) {
-        setAuth({ status: "authenticated", userId: data.session.user.id });
-        await refreshAdmin(data.session.user.id);
-        await refresh();
-      } else if (inTelegram) {
-        await signInWithTelegram();
-      } else {
-        // Browser context → show email auth screen (no error code)
-        setAuth({ status: "unauthenticated" });
+      try {
+        const { data } = await supabase.auth.getSession();
+        if (data.session?.user) {
+          setAuth({ status: "authenticated", userId: data.session.user.id });
+          await refreshAdmin(data.session.user.id);
+          await refresh();
+        } else if (inTelegram) {
+          await signInWithTelegram();
+        } else {
+          // Browser context → show email auth screen (no error code)
+          setAuth({ status: "unauthenticated" });
+        }
+      } catch (e) {
+        console.error("[TeamReach] Auth initialization failed:", e);
+        // Prevent stuck loading state — fall back gracefully
+        if (inTelegram) {
+          await signInWithTelegram();
+        } else {
+          setAuth({ status: "unauthenticated" });
+        }
       }
     })();
 
