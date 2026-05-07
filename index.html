@@ -1,23 +1,36 @@
-<!doctype html>
-<html lang="en">
+<!DOCTYPE html>
+<html lang="ru">
   <head>
     <meta charset="UTF-8" />
     <meta name="viewport" content="width=device-width, initial-scale=1.0" />
-    <title>TeamReach Challenge — Achieve goals together</title>
-    <meta name="description" content="Track team challenges, log daily progress and celebrate shared results. GDPR-compliant team motivation.">
+    <title>TeamReach Challenge — Достигайте целей вместе</title>
+    <meta name="description" content="Отслеживайте командные челленджи и празднуйте общие результаты.">
+
     <link rel="preconnect" href="https://fonts.googleapis.com" />
     <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
     <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800;900&display=swap" rel="stylesheet" />
-    <script async src="https://telegram.org/js/telegram-web-app.js"></script>
-    <meta property="og:title" content="TeamReach Challenge — Achieve goals together">
-  <meta name="twitter:title" content="TeamReach Challenge — Achieve goals together">
-  <meta property="og:description" content="Track team challenges, log daily progress and celebrate shared results. GDPR-compliant team motivation.">
-  <meta name="twitter:description" content="Track team challenges, log daily progress and celebrate shared results. GDPR-compliant team motivation.">
-  <meta property="og:image" content="https://pub-bb2e103a32db4e198524a2e9ed8f35b4.r2.dev/41a08d51-39bb-433f-ab17-8c02c23467dd/id-preview-b07286e6--eb3adc9b-7387-4e51-8092-2ee0996b65ab.lovable.app-1777490814274.png">
-  <meta name="twitter:image" content="https://pub-bb2e103a32db4e198524a2e9ed8f35b4.r2.dev/41a08d51-39bb-433f-ab17-8c02c23467dd/id-preview-b07286e6--eb3adc9b-7387-4e51-8092-2ee0996b65ab.lovable.app-1777490814274.png">
-  <meta name="twitter:card" content="summary_large_image">
-  <meta property="og:type" content="website">
-</head>
+
+    <script src="https://telegram.org/js/telegram-web-app.js"></script>
+
+    <script>
+      function initializeTelegramApp() {
+        if (window.Telegram && window.Telegram.WebApp) {
+          const tg = window.Telegram.WebApp;
+          tg.ready();
+          tg.expand();
+          console.log("Telegram SDK: Инициализация успешна");
+        }
+      }
+      // Пробуем инициализировать сразу
+      initializeTelegramApp();
+      // И на случай медленной загрузки
+      document.addEventListener("DOMContentLoaded", initializeTelegramApp);
+      setTimeout(initializeTelegramApp, 500);
+    </script>
+
+    <meta property="og:title" content="TeamReach Challenge">
+    <meta property="og:type" content="website">
+  </head>
 
   <body>
     <div id="root"></div>
