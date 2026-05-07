@@ -1,0 +1,94 @@
+@tailwind base;
+@tailwind components;
+@tailwind utilities;
+
+@layer base {
+  :root {
+    --background: 220 40% 98%;
+    --foreground: 222 47% 11%;
+
+    --card: 0 0% 100%;
+    --card-foreground: 222 47% 11%;
+
+    --popover: 0 0% 100%;
+    --popover-foreground: 222 47% 11%;
+
+    --primary: 224 100% 58%;
+    --primary-foreground: 0 0% 100%;
+    --primary-glow: 224 100% 70%;
+    --primary-soft: 220 100% 96%;
+
+    --secondary: 220 30% 96%;
+    --secondary-foreground: 222 47% 11%;
+
+    --muted: 220 25% 95%;
+    --muted-foreground: 220 10% 50%;
+
+    --accent: 220 100% 96%;
+    --accent-foreground: 224 100% 40%;
+
+    --destructive: 0 84% 60%;
+    --destructive-foreground: 0 0% 100%;
+
+    --border: 220 20% 92%;
+    --input: 220 20% 92%;
+    --ring: 224 100% 58%;
+
+    --radius: 1.25rem;
+
+    /* Pastel card surfaces */
+    --surface-blue: 215 80% 92%;
+    --surface-blue-foreground: 222 60% 20%;
+    --surface-mint: 90 50% 90%;
+    --surface-mint-foreground: 90 30% 20%;
+    --surface-peach: 30 80% 92%;
+    --surface-peach-foreground: 25 50% 20%;
+    --surface-lilac: 260 60% 94%;
+    --surface-lilac-foreground: 260 40% 25%;
+
+    --gradient-primary: linear-gradient(135deg, hsl(224 100% 58%), hsl(230 100% 65%));
+    --gradient-card: linear-gradient(135deg, hsl(224 100% 58%), hsl(224 90% 50%));
+    --shadow-soft: 0 8px 30px -12px hsl(224 60% 50% / 0.18);
+    --shadow-card: 0 20px 50px -20px hsl(224 80% 40% / 0.35);
+
+    --sidebar-background: 0 0% 98%;
+    --sidebar-foreground: 240 5.3% 26.1%;
+    --sidebar-primary: 240 5.9% 10%;
+    --sidebar-primary-foreground: 0 0% 98%;
+    --sidebar-accent: 240 4.8% 95.9%;
+    --sidebar-accent-foreground: 240 5.9% 10%;
+    --sidebar-border: 220 13% 91%;
+    --sidebar-ring: 217.2 91.2% 59.8%;
+  }
+}
+
+@layer base {
+  * {
+    @apply border-border;
+  }
+
+  html, body, #root {
+    @apply h-full;
+  }
+
+  body {
+    @apply bg-background text-foreground antialiased;
+    font-family: 'Inter', system-ui, -apple-system, sans-serif;
+    font-feature-settings: "ss01", "cv11";
+  }
+
+  h1, h2, h3, h4 {
+    @apply tracking-tight;
+    font-weight: 700;
+  }
+}
+
+@layer components {
+  .app-shell {
+    @apply mx-auto w-full max-w-md min-h-screen bg-background relative;
+  }
+
+  .pill {
+    @apply rounded-full px-5 py-2.5 text-sm font-semibold transition-colors;
+  }
+}
