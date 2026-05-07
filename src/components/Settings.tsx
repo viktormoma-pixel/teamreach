@@ -7,11 +7,37 @@ import {
   AlertDialog, AlertDialogAction, AlertDialogCancel, AlertDialogContent,
   AlertDialogDescription, AlertDialogFooter, AlertDialogHeader, AlertDialogTitle, AlertDialogTrigger,
 } from "@/components/ui/alert-dialog";
-import { ChevronRight, Shield, FileText, Mail, Trash2, ShieldCheck, Languages, Link2, Loader2, AlertCircle, CheckCircle2, LogOut } from "lucide-react";
+import { ChevronRight, Shield, FileText, Mail, Trash2, ShieldCheck, Languages, Link2, Loader2, AlertCircle, CheckCircle2, LogOut, Send } from "lucide-react";
 import { useEffect, useState } from "react";
 import { toast } from "sonner";
 import { supabase } from "@/integrations/supabase/client";
 import { useNavigate } from "react-router-dom";
+
+// Inline i18n strings for the auth-method indicator. Kept here to avoid
+// editing the large translations.ts dictionary.
+const AUTH_METHOD_STRINGS = {
+  en: {
+    method: "Sign-in method",
+    telegram: "Telegram",
+    email: "Email",
+    telegramDesc: "Synced via Telegram WebApp",
+    emailDesc: "Standalone email account — not synced with any Telegram account",
+  },
+  ru: {
+    method: "Способ входа",
+    telegram: "Telegram",
+    email: "Email",
+    telegramDesc: "Синхронизация через Telegram WebApp",
+    emailDesc: "Отдельный email-аккаунт — не связан с Telegram-аккаунтом",
+  },
+  de: {
+    method: "Anmeldemethode",
+    telegram: "Telegram",
+    email: "E-Mail",
+    telegramDesc: "Synchronisiert über Telegram WebApp",
+    emailDesc: "Eigenständiges E-Mail-Konto — nicht mit Telegram verknüpft",
+  },
+} as const;
 
 const Row = ({ icon: Icon, label, hint, right, onClick }: any) => (
   <button
@@ -33,11 +59,22 @@ export const Settings = () => {
   const { resetAll, isAdmin, auth, signInWithTelegram, signOut } = useApp();
   const { t, lang, setLang } = useI18n();
   const navigate = useNavigate();
-  const [profile, setProfile] = useState<{ first_name?: string | null; username?: string | null; telegram_id?: number | null; photo_url?: string | null } | null>(null);
+  const [profile, setProfile] = useState<{
+    first_name?: string | null;
+    username?: string | null;
+    telegram_id?: number | null;
+    photo_url?: string | null;
+    email?: string | null;
+  } | null>(null);
   const [reconnecting, setReconnecting] = useState(false);
   const [deleting, setDeleting] = useState(false);
 
   const userId = auth.status === "authenticated" ? auth.userId : null;
+
+  const authStrings = AUTH_METHOD_STRINGS[lang as keyof typeof AUTH_METHOD_STRINGS] ?? AUTH_METHOD_STRINGS.en;
+
+  // Method = telegram if profile has telegram_id, otherwise email
+  const isTelegramAuth = !!profile?.telegram_id;
 
   const handleReconnect = async () => {
     setReconnecting(true);
@@ -58,7 +95,7 @@ export const Settings = () => {
     (async () => {
       const { data } = await supabase
         .from("profiles")
-        .select("first_name,username,telegram_id,photo_url")
+        .select("first_name,username,telegram_id,photo_url,email")
         .eq("id", userId)
         .maybeSingle();
       setProfile(data ?? null);
@@ -80,6 +117,13 @@ export const Settings = () => {
     }
   };
 
+  // Subline under the username card: shows telegram_id, email, or "—".
+  const profileSubline = isTelegramAuth
+    ? `Telegram ID · ${profile?.telegram_id}`
+    : profile?.email
+      ? profile.email
+      : "—";
+
   return (
     <div className="px-5 pt-12 pb-32">
       <header>
@@ -92,39 +136,62 @@ export const Settings = () => {
           <img src={profile.photo_url} alt="" className="h-14 w-14 rounded-full object-cover" />
         ) : (
           <div className="h-14 w-14 rounded-full bg-background/20 grid place-items-center text-xl font-extrabold">
-            {(profile?.first_name || profile?.username || "?").slice(0, 1).toUpperCase()}
+            {(profile?.first_name || profile?.username || profile?.email || "?").slice(0, 1).toUpperCase()}
           </div>
         )}
         <div className="flex-1 min-w-0">
-          <p className="font-bold truncate">{profile?.first_name || profile?.username || "User"}</p>
-          <p className="text-sm opacity-80 truncate">
-            {profile?.telegram_id ? `Telegram ID · ${profile.telegram_id}` : "—"}
-          </p>
+          <p className="font-bold truncate">{profile?.first_name || profile?.username || profile?.email || "User"}</p>
+          <p className="text-sm opacity-80 truncate">{profileSubline}</p>
         </div>
       </div>
 
-      <h2 className="mt-8 mb-2 text-xs font-bold uppercase tracking-wider text-muted-foreground px-2">{t("set.connection.section")}</h2>
+      {/* Sign-in method indicator */}
+      <h2 className="mt-8 mb-2 text-xs font-bold uppercase tracking-wider text-muted-foreground px-2">
+        {authStrings.method}
+      </h2>
       <div className="rounded-3xl bg-card border border-border overflow-hidden shadow-soft">
         <div className="flex items-center gap-4 p-4">
-          <div className={`h-10 w-10 rounded-2xl grid place-items-center ${isConnected ? "bg-primary-soft text-primary" : "bg-destructive/10 text-destructive"}`}>
-            {isConnected ? <CheckCircle2 className="h-5 w-5" /> : <AlertCircle className="h-5 w-5" />}
+          <div className={`h-10 w-10 rounded-2xl grid place-items-center ${isTelegramAuth ? "bg-primary-soft text-primary" : "bg-secondary text-muted-foreground"}`}>
+            {isTelegramAuth ? <Send className="h-5 w-5" /> : <Mail className="h-5 w-5" />}
           </div>
           <div className="flex-1 min-w-0">
-            <p className="font-semibold text-sm">{t("set.connection.title")}</p>
-            <p className="text-xs text-muted-foreground truncate">
-              {isConnected ? t("set.connection.ok") : t("set.connection.failed")}
+            <p className="font-semibold text-sm">
+              {isTelegramAuth ? authStrings.telegram : authStrings.email}
+            </p>
+            <p className="text-xs text-muted-foreground leading-relaxed">
+              {isTelegramAuth ? authStrings.telegramDesc : authStrings.emailDesc}
             </p>
           </div>
-          <button
-            onClick={handleReconnect}
-            disabled={reconnecting}
-            className="h-9 px-3 rounded-full bg-secondary hover:bg-secondary/80 text-xs font-semibold inline-flex items-center gap-1.5 disabled:opacity-50"
-          >
-            {reconnecting ? <Loader2 className="h-3.5 w-3.5 animate-spin" /> : <Link2 className="h-3.5 w-3.5" />}
-            {reconnecting ? t("set.connection.connecting") : t("set.connection.reconnect")}
-          </button>
         </div>
       </div>
+
+      {/* Connection status — only relevant for Telegram users */}
+      {isTelegramAuth && (
+        <>
+          <h2 className="mt-8 mb-2 text-xs font-bold uppercase tracking-wider text-muted-foreground px-2">{t("set.connection.section")}</h2>
+          <div className="rounded-3xl bg-card border border-border overflow-hidden shadow-soft">
+            <div className="flex items-center gap-4 p-4">
+              <div className={`h-10 w-10 rounded-2xl grid place-items-center ${isConnected ? "bg-primary-soft text-primary" : "bg-destructive/10 text-destructive"}`}>
+                {isConnected ? <CheckCircle2 className="h-5 w-5" /> : <AlertCircle className="h-5 w-5" />}
+              </div>
+              <div className="flex-1 min-w-0">
+                <p className="font-semibold text-sm">{t("set.connection.title")}</p>
+                <p className="text-xs text-muted-foreground truncate">
+                  {isConnected ? t("set.connection.ok") : t("set.connection.failed")}
+                </p>
+              </div>
+              <button
+                onClick={handleReconnect}
+                disabled={reconnecting}
+                className="h-9 px-3 rounded-full bg-secondary hover:bg-secondary/80 text-xs font-semibold inline-flex items-center gap-1.5 disabled:opacity-50"
+              >
+                {reconnecting ? <Loader2 className="h-3.5 w-3.5 animate-spin" /> : <Link2 className="h-3.5 w-3.5" />}
+                {reconnecting ? t("set.connection.connecting") : t("set.connection.reconnect")}
+              </button>
+            </div>
+          </div>
+        </>
+      )}
 
       <h2 className="mt-8 mb-2 text-xs font-bold uppercase tracking-wider text-muted-foreground px-2">{t("set.preferences")}</h2>
       <div className="rounded-3xl bg-card border border-border divide-y divide-border overflow-hidden shadow-soft">
