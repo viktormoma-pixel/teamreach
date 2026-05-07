@@ -1,11 +1,13 @@
 import { createRoot } from "react-dom/client";
 import App from "./App.tsx";
 import "./index.css";
+import { getTelegram } from "./lib/telegram";
 
 // Tell Telegram the Mini App is ready — removes the white loading overlay
-if (typeof window !== "undefined" && window.Telegram?.WebApp) {
-  window.Telegram.WebApp.ready();
-  window.Telegram.WebApp.expand();
+const tg = getTelegram();
+if (tg) {
+  tg.ready();
+  tg.expand();
 }
 
 createRoot(document.getElementById("root")!).render(<App />);
