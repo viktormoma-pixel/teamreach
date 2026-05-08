@@ -1,6 +1,6 @@
 import { createContext, useContext, useEffect, useState, ReactNode, useCallback } from "react";
 import { supabase } from "@/integrations/supabase/client";
-import { getInitData, getTelegram } from "@/lib/telegram";
+import { getInitData, getTelegram, isInTelegram, waitForInitData } from "@/lib/telegram";
 import type { Challenge, Participant } from "@/data/challenges";
 
 type Tab = "home" | "leaderboard" | "settings";
@@ -194,10 +194,15 @@ export const AppProvider = ({ children }: { children: ReactNode }) => {
   }, []);
 
   // --- Telegram auth ---
+  // BUG FIX: wait up to 3s for Telegram's initData to populate before giving up.
+  // Telegram injects window.Telegram.WebApp synchronously, but the signed
+  // initData payload arrives a few hundred ms later — especially on cold
+  // starts and slow networks. Without waiting, ~3-5 first opens would fall
+  // back to the email-auth screen ("empty account" symptom).
   const signInWithTelegram = useCallback(async () => {
     setAuth({ status: "loading" });
     try {
-      const initData = getInitData();
+      const initData = await waitForInitData(3000);
       if (!initData) throw new Error("not in telegram");
 
       const { data, error } = await supabase.functions.invoke("telegram-auth", {
@@ -249,12 +254,15 @@ export const AppProvider = ({ children }: { children: ReactNode }) => {
   }, []);
 
   // --- App bootstrap ---
-  // BUG FIX: only call signInWithTelegram() when actually inside Telegram WebApp context;
-  // otherwise show email auth screen (no error code set).
+  // BUG FIX: when running inside Telegram, prefer Telegram auth over a stale
+  // cached session. Otherwise, after a user signs in via email in a regular
+  // browser, the cached session lives in localStorage and gets re-used the
+  // next time they open the Mini App in Telegram — showing them the wrong
+  // ("empty") account.
   useEffect(() => {
     try { setOnboardedState(localStorage.getItem(ONBOARD_KEY) === "1"); } catch {}
 
-    const inTelegram = !!getTelegram();
+    const inTelegram = isInTelegram();
 
     // Listen for ongoing auth events (new sign-ins, token refresh, sign-out)
     const { data: { subscription } } = supabase.auth.onAuthStateChange(async (evt, session) => {
@@ -269,19 +277,24 @@ export const AppProvider = ({ children }: { children: ReactNode }) => {
       }
     });
 
-    // Check for an existing persisted session on startup
     (async () => {
       try {
-        const { data } = await supabase.auth.getSession();
-        if (data.session?.user) {
-          setAuth({ status: "authenticated", userId: data.session.user.id });
-          await refreshAdmin(data.session.user.id);
-          await refresh();
-        } else if (inTelegram) {
+        if (inTelegram) {
+          // Inside Telegram: always (re)authenticate via initData. This
+          // guarantees the session always belongs to the current Telegram
+          // user, even if a different account was previously cached.
           await signInWithTelegram();
         } else {
-          // Browser context → show email auth screen (no error code)
-          setAuth({ status: "unauthenticated" });
+          // Browser context: restore persisted email session if any.
+          const { data } = await supabase.auth.getSession();
+          if (data.session?.user) {
+            setAuth({ status: "authenticated", userId: data.session.user.id });
+            await refreshAdmin(data.session.user.id);
+            await refresh();
+          } else {
+            // Browser with no session → show email auth screen (no error code)
+            setAuth({ status: "unauthenticated" });
+          }
         }
       } catch (e) {
         console.error("[TeamReach] Auth initialization failed:", e);
@@ -372,6 +385,10 @@ export const AppProvider = ({ children }: { children: ReactNode }) => {
 
   // No-op: roles are managed server-side only. Kept for backwards compat.
   const setIsAdmin = (_v: boolean) => {};
+
+  // Suppress unused-import warning for getInitData / getTelegram (re-exported
+  // for potential external use; kept here so future code can import directly).
+  void getInitData; void getTelegram;
 
   return (
     <AppContext.Provider
