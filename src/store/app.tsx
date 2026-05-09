@@ -288,6 +288,15 @@ export const AppProvider = ({ children }: { children: ReactNode }) => {
           // Step 2: inside Telegram → always re-auth via initData. This
           // guarantees the session always belongs to the current Telegram
           // user, even if a different account was previously cached.
+          //
+          // Also wipe any stale Supabase session from localStorage first.
+          // Without this, an old email session (from earlier tests) keeps
+          // its expired access_token alive in the client and silently
+          // poisons every subsequent query with RLS-blocked empty results
+          // — visible to users as "User" / "?" / 0 challenges.
+          try {
+            await supabase.auth.signOut({ scope: "local" });
+          } catch { /* signOut errors are non-fatal */ }
           await signInWithTelegram();
         } else {
           // Step 3: regular browser → restore persisted email session if any.
