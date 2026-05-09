@@ -1,6 +1,6 @@
 import { createContext, useContext, useEffect, useState, ReactNode, useCallback } from "react";
 import { supabase } from "@/integrations/supabase/client";
-import { getInitData, getTelegram, isInTelegram, waitForInitData } from "@/lib/telegram";
+import { getInitData, getTelegram, isInTelegram, waitForInitData, waitForTelegramSdk } from "@/lib/telegram";
 import type { Challenge, Participant } from "@/data/challenges";
 
 type Tab = "home" | "leaderboard" | "settings";
@@ -194,15 +194,15 @@ export const AppProvider = ({ children }: { children: ReactNode }) => {
   }, []);
 
   // --- Telegram auth ---
-  // BUG FIX: wait up to 3s for Telegram's initData to populate before giving up.
+  // BUG FIX: wait up to 5s for Telegram's initData to populate before giving up.
   // Telegram injects window.Telegram.WebApp synchronously, but the signed
   // initData payload arrives a few hundred ms later — especially on cold
-  // starts and slow networks. Without waiting, ~3-5 first opens would fall
+  // starts and slow networks. Without waiting, the first 3-5 opens would fall
   // back to the email-auth screen ("empty account" symptom).
   const signInWithTelegram = useCallback(async () => {
     setAuth({ status: "loading" });
     try {
-      const initData = await waitForInitData(3000);
+      const initData = await waitForInitData(5000);
       if (!initData) throw new Error("not in telegram");
 
       const { data, error } = await supabase.functions.invoke("telegram-auth", {
@@ -222,7 +222,7 @@ export const AppProvider = ({ children }: { children: ReactNode }) => {
       setAuth({ status: "authenticated", userId: data.user_id });
       await refresh();
     } catch (e) {
-      console.error("signInWithTelegram failed", e);
+      console.error("[TeamReach] signInWithTelegram failed", e);
       const { code, detail } = classifyAuthError(e);
       setAuth({ status: "unauthenticated", errorCode: code, errorDetail: detail });
     }
@@ -254,15 +254,15 @@ export const AppProvider = ({ children }: { children: ReactNode }) => {
   }, []);
 
   // --- App bootstrap ---
-  // BUG FIX: when running inside Telegram, prefer Telegram auth over a stale
-  // cached session. Otherwise, after a user signs in via email in a regular
-  // browser, the cached session lives in localStorage and gets re-used the
-  // next time they open the Mini App in Telegram — showing them the wrong
-  // ("empty") account.
+  // Important ordering of checks (the cause of the "empty account on first
+  // open, real account after 3-5 retries" symptom):
+  //   1. Wait up to 3s for the Telegram SDK script to load (it's loaded from
+  //      telegram.org and on slow networks may not be ready when React mounts).
+  //   2. If we ARE in Telegram, always re-authenticate via initData (ignore
+  //      any cached email/Supabase session in localStorage).
+  //   3. If we are NOT in Telegram, restore any persisted email session.
   useEffect(() => {
     try { setOnboardedState(localStorage.getItem(ONBOARD_KEY) === "1"); } catch {}
-
-    const inTelegram = isInTelegram();
 
     // Listen for ongoing auth events (new sign-ins, token refresh, sign-out)
     const { data: { subscription } } = supabase.auth.onAuthStateChange(async (evt, session) => {
@@ -279,27 +279,31 @@ export const AppProvider = ({ children }: { children: ReactNode }) => {
 
     (async () => {
       try {
+        // Step 1: wait for Telegram SDK to load (up to 3s). Returns true even
+        // if only the URL hint says we're in Telegram (slow SDK load).
+        const inTelegram = await waitForTelegramSdk(3000);
+        console.info("[TeamReach] inTelegram =", inTelegram);
+
         if (inTelegram) {
-          // Inside Telegram: always (re)authenticate via initData. This
+          // Step 2: inside Telegram → always re-auth via initData. This
           // guarantees the session always belongs to the current Telegram
           // user, even if a different account was previously cached.
           await signInWithTelegram();
         } else {
-          // Browser context: restore persisted email session if any.
+          // Step 3: regular browser → restore persisted email session if any.
           const { data } = await supabase.auth.getSession();
           if (data.session?.user) {
             setAuth({ status: "authenticated", userId: data.session.user.id });
             await refreshAdmin(data.session.user.id);
             await refresh();
           } else {
-            // Browser with no session → show email auth screen (no error code)
             setAuth({ status: "unauthenticated" });
           }
         }
       } catch (e) {
         console.error("[TeamReach] Auth initialization failed:", e);
-        // Prevent stuck loading state — fall back gracefully
-        if (inTelegram) {
+        // Last-ditch: try Telegram auth one more time if SDK might have just loaded
+        if (isInTelegram()) {
           await signInWithTelegram();
         } else {
           setAuth({ status: "unauthenticated" });
