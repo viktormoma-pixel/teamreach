@@ -134,9 +134,14 @@ export const AppProvider = ({ children }: { children: ReactNode }) => {
   // --- challenges data fetch ---
   // BUG FIX: getUser() separated from Promise.all to handle errors without crashing
   const refresh = useCallback(async () => {
-    const { data: userData, error: userError } = await supabase.auth.getUser();
-    if (userError || !userData.user) return;
-    const me = userData.user.id;
+    // Use getSession() instead of getUser() — getSession reads from local
+    // cache immediately without a network round-trip. getUser() validates the
+    // JWT against the server which can return null during rapid auth state
+    // changes (signOut → signInWithTelegram bootstrap), causing challenges
+    // to silently stay empty and the profile to show the "TeamReach" fallback.
+    const { data: { session } } = await supabase.auth.getSession();
+    if (!session?.user) return;
+    const me = session.user.id;
 
     const { data: chs } = await supabase
       .from("challenges")
