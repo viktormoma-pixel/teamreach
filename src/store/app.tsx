@@ -1,6 +1,6 @@
-import { createContext, useContext, useEffect, useState, ReactNode, useCallback } from "react";
+import { createContext, useContext, useEffect, useState, useRef, ReactNode, useCallback } from "react";
 import { supabase } from "@/integrations/supabase/client";
-import { getInitData, getTelegram, isInTelegram, waitForInitData, waitForTelegramSdk } from "@/lib/telegram";
+import { getInitData, getTelegram, isInTelegram, waitForInitData } from "@/lib/telegram";
 import type { Challenge, Participant } from "@/data/challenges";
 
 type Tab = "home" | "leaderboard" | "settings";
@@ -111,6 +111,11 @@ export const AppProvider = ({ children }: { children: ReactNode }) => {
   const [selectedId, setSelectedId] = useState<string | null>(null);
   const [tab, setTab] = useState<Tab>("home");
   const [isAdmin, setIsAdminState] = useState(false);
+
+  // True while the initial bootstrap IIFE is running. Used to suppress the
+  // SIGNED_OUT event that fires when we call signOut({ scope: "local" }) during
+  // Telegram re-auth — without this guard the email screen flashes briefly.
+  const bootstrappingRef = useRef(true);
 
   const setOnboarded = (v: boolean) => {
     setOnboardedState(v);
@@ -271,6 +276,9 @@ export const AppProvider = ({ children }: { children: ReactNode }) => {
         await refreshAdmin(session.user.id);
         await refresh();
       } else if (evt === "SIGNED_OUT") {
+        // Ignore the SIGNED_OUT that fires when we wipe the local session
+        // at the start of Telegram re-authentication (bootstrap phase).
+        if (bootstrappingRef.current) return;
         setAuth({ status: "unauthenticated" });
         setIsAdminState(false);
         setChallenges([]);
@@ -279,21 +287,23 @@ export const AppProvider = ({ children }: { children: ReactNode }) => {
 
     (async () => {
       try {
-        // Step 1: wait for Telegram SDK to load (up to 3s). Returns true even
-        // if only the URL hint says we're in Telegram (slow SDK load).
-        const inTelegram = await waitForTelegramSdk(3000);
-        console.info("[TeamReach] inTelegram =", inTelegram);
+        // Step 1: wait up to 3s for Telegram's signed initData to appear.
+        // window.Telegram.WebApp is created by the SDK script in ANY browser,
+        // so checking for its mere existence (waitForTelegramSdk) always
+        // returns true — even in a regular desktop browser. initData is the
+        // ONLY reliable signal: it is a non-empty signed string exclusively
+        // when we run inside a real Telegram Mini App WebView.
+        const initData = await waitForInitData(3000);
+        console.info("[TeamReach] initData present =", !!initData);
 
-        if (inTelegram) {
-          // Step 2: inside Telegram → always re-auth via initData. This
-          // guarantees the session always belongs to the current Telegram
+        if (initData) {
+          // Step 2: inside Telegram Mini App → always re-auth via initData.
+          // This guarantees the session always belongs to the current Telegram
           // user, even if a different account was previously cached.
           //
-          // Also wipe any stale Supabase session from localStorage first.
-          // Without this, an old email session (from earlier tests) keeps
-          // its expired access_token alive in the client and silently
-          // poisons every subsequent query with RLS-blocked empty results
-          // — visible to users as "User" / "?" / 0 challenges.
+          // Wipe any stale Supabase session from localStorage first so that
+          // an old email session doesn't silently poison RLS queries.
+          // The SIGNED_OUT event that fires here is suppressed by bootstrappingRef.
           try {
             await supabase.auth.signOut({ scope: "local" });
           } catch { /* signOut errors are non-fatal */ }
@@ -311,12 +321,15 @@ export const AppProvider = ({ children }: { children: ReactNode }) => {
         }
       } catch (e) {
         console.error("[TeamReach] Auth initialization failed:", e);
-        // Last-ditch: try Telegram auth one more time if SDK might have just loaded
+        // Last-ditch: try Telegram auth if SDK loaded after the timeout
         if (isInTelegram()) {
           await signInWithTelegram();
         } else {
           setAuth({ status: "unauthenticated" });
         }
+      } finally {
+        // Bootstrap complete — SIGNED_OUT events from here on are real sign-outs
+        bootstrappingRef.current = false;
       }
     })();
 
