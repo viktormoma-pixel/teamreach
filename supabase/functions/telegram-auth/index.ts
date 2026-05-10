@@ -173,17 +173,47 @@ Deno.serve(async (req) => {
       });
 
       if (createErr || !created.user) {
-        // Race / already exists — look up by synthetic email using the admin API filter
-        // (avoids listUsers() which pages through ALL users and is slow/unsafe at scale)
-        const { data: list } = await admin.auth.admin.listUsers({ perPage: 1, page: 1 });
-        // listUsers doesn't support email filter in older SDK versions;
-        // use getUserByEmail (admin API) instead which is O(1)
-        const { data: byEmail } = await (admin.auth.admin as any).getUserByEmail?.(syntheticEmail) ??
-          // Fallback for SDK versions without getUserByEmail: filter the single-page result
-          { data: { user: list?.users?.find((u: { email: string }) => u.email === syntheticEmail) } };
-        const found = byEmail?.user ?? byEmail;
-        if (!found?.id) return json({ error: createErr?.message ?? "createUser failed" }, 500);
-        userId = found.id;
+        // User already exists with this synthetic email (race / orphaned account).
+        // Search reliably via paginated listing — the old perPage:1 approach only
+        // ever returned the first user in the DB and almost never matched.
+        let foundUser: { id: string } | null = null;
+
+        // Try getUserByEmail first (available in newer SDK versions)
+        try {
+          const res = await (admin.auth.admin as any).getUserByEmail(syntheticEmail);
+          const u = res?.data?.user ?? res?.data;
+          if (u?.id) foundUser = u;
+        } catch (_) { /* method not available in this SDK version */ }
+
+        // Fallback: paginated scan through all users
+        if (!foundUser) {
+          for (let page = 1; page <= 50 && !foundUser; page++) {
+            const { data: pageData } = await admin.auth.admin.listUsers({ perPage: 1000, page });
+            if (!pageData?.users?.length) break;
+            foundUser = pageData.users.find(
+              (u: { email: string }) => u.email === syntheticEmail,
+            ) ?? null;
+            if (pageData.users.length < 1000) break; // last page reached
+          }
+        }
+
+        if (!foundUser?.id) {
+          return json({ error: createErr?.message ?? "createUser failed" }, 500);
+        }
+        userId = foundUser.id;
+
+        // Refresh metadata so it stays current even for pre-existing users
+        await admin.auth.admin.updateUserById(userId, {
+          user_metadata: {
+            telegram_id: String(tg.id),
+            username: tg.username ?? null,
+            first_name: tg.first_name ?? null,
+            last_name: tg.last_name ?? null,
+            photo_url: tg.photo_url ?? null,
+            language_code: tg.language_code ?? null,
+            provider: "telegram",
+          },
+        });
       } else {
         userId = created.user.id;
       }
@@ -201,16 +231,20 @@ Deno.serve(async (req) => {
         .eq("id", userId);
     }
 
-    // Ensure profile exists (in case trigger failed for any reason)
-    await admin.from("profiles").upsert({
-      id: userId,
-      telegram_id: tg.id,
-      username: tg.username ?? null,
-      first_name: tg.first_name ?? null,
-      last_name: tg.last_name ?? null,
-      photo_url: tg.photo_url ?? null,
-      language_code: tg.language_code ?? null,
-    });
+    // Ensure profile row always exists with fresh Telegram data
+    const { error: upsertErr } = await admin.from("profiles").upsert(
+      {
+        id: userId,
+        telegram_id: tg.id,
+        username: tg.username ?? null,
+        first_name: tg.first_name ?? null,
+        last_name: tg.last_name ?? null,
+        photo_url: tg.photo_url ?? null,
+        language_code: tg.language_code ?? null,
+      },
+      { onConflict: "id" },
+    );
+    if (upsertErr) console.error("[telegram-auth] profile upsert failed:", upsertErr);
 
     // Admin role sync based on ADMIN_TELEGRAM_IDS
     const isAdmin = ADMIN_IDS.includes(tg.id);
