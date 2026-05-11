@@ -1,6 +1,5 @@
-import { createContext, useContext, useEffect, useState, useRef, ReactNode, useCallback } from "react";
+import { createContext, useContext, useEffect, useState, useCallback, ReactNode } from "react";
 import { supabase } from "@/integrations/supabase/client";
-import { getInitData, getTelegram, isInTelegram, waitForInitData } from "@/lib/telegram";
 import type { Challenge, Participant } from "@/data/challenges";
 
 type Tab = "home" | "leaderboard" | "settings";
@@ -15,9 +14,6 @@ export type NewChallengeInput = {
 };
 
 export type AuthErrorCode =
-  | "no_telegram"
-  | "invalid_init_data"
-  | "stale_init_data"
   | "network"
   | "server"
   | "session"
@@ -31,12 +27,6 @@ type AuthState =
 export function classifyAuthError(raw: unknown): { code: AuthErrorCode; detail: string } {
   const detail = raw instanceof Error ? raw.message : typeof raw === "string" ? raw : "Unknown error";
   const m = detail.toLowerCase();
-  if (m.includes("initdata required") || m.includes("no telegram") || m.includes("not in telegram"))
-    return { code: "no_telegram", detail };
-  if (m.includes("bad hash") || m.includes("missing hash") || m.includes("missing user") || m.includes("invalid initdata"))
-    return { code: "invalid_init_data", detail };
-  if (m.includes("stale") || m.includes("auth_date"))
-    return { code: "stale_init_data", detail };
   if (m.includes("failed to fetch") || m.includes("networkerror") || m.includes("network"))
     return { code: "network", detail };
   if (m.includes("session") || m.includes("setsession") || m.includes("verify"))
@@ -48,7 +38,6 @@ export function classifyAuthError(raw: unknown): { code: AuthErrorCode; detail: 
 
 type AppContextValue = {
   auth: AuthState;
-  signInWithTelegram: () => Promise<void>;
   signInWithEmail: (email: string, password: string) => Promise<void>;
   signUpWithEmail: (email: string, password: string) => Promise<void>;
   signOut: () => Promise<void>;
@@ -112,11 +101,6 @@ export const AppProvider = ({ children }: { children: ReactNode }) => {
   const [tab, setTab] = useState<Tab>("home");
   const [isAdmin, setIsAdminState] = useState(false);
 
-  // True while the initial bootstrap IIFE is running. Used to suppress the
-  // SIGNED_OUT event that fires when we call signOut({ scope: "local" }) during
-  // Telegram re-auth — without this guard the email screen flashes briefly.
-  const bootstrappingRef = useRef(true);
-
   const setOnboarded = (v: boolean) => {
     setOnboardedState(v);
     try { localStorage.setItem(ONBOARD_KEY, v ? "1" : "0"); } catch {}
@@ -132,13 +116,8 @@ export const AppProvider = ({ children }: { children: ReactNode }) => {
   }, []);
 
   // --- challenges data fetch ---
-  // BUG FIX: getUser() separated from Promise.all to handle errors without crashing
   const refresh = useCallback(async () => {
-    // Use getSession() instead of getUser() — getSession reads from local
-    // cache immediately without a network round-trip. getUser() validates the
-    // JWT against the server which can return null during rapid auth state
-    // changes (signOut → signInWithTelegram bootstrap), causing challenges
-    // to silently stay empty and the profile to show the "TeamReach" fallback.
+    // Use getSession() — reads from local cache without a network round-trip.
     const { data: { session } } = await supabase.auth.getSession();
     if (!session?.user) return;
     const me = session.user.id;
@@ -203,41 +182,6 @@ export const AppProvider = ({ children }: { children: ReactNode }) => {
     setChallenges(out);
   }, []);
 
-  // --- Telegram auth ---
-  // BUG FIX: wait up to 5s for Telegram's initData to populate before giving up.
-  // Telegram injects window.Telegram.WebApp synchronously, but the signed
-  // initData payload arrives a few hundred ms later — especially on cold
-  // starts and slow networks. Without waiting, the first 3-5 opens would fall
-  // back to the email-auth screen ("empty account" symptom).
-  const signInWithTelegram = useCallback(async () => {
-    setAuth({ status: "loading" });
-    try {
-      const initData = await waitForInitData(5000);
-      if (!initData) throw new Error("not in telegram");
-
-      const { data, error } = await supabase.functions.invoke("telegram-auth", {
-        body: { initData },
-      });
-      if (error) throw error;
-      if (!data?.access_token) throw new Error("no session returned");
-
-      const { error: setErr } = await supabase.auth.setSession({
-        access_token: data.access_token,
-        refresh_token: data.refresh_token,
-      });
-      if (setErr) throw setErr;
-
-      // Trust the server-issued admin flag for instant UI; onAuthStateChange also refreshes
-      setIsAdminState(!!data.is_admin);
-      setAuth({ status: "authenticated", userId: data.user_id });
-      await refresh();
-    } catch (e) {
-      console.error("[TeamReach] signInWithTelegram failed", e);
-      const { code, detail } = classifyAuthError(e);
-      setAuth({ status: "unauthenticated", errorCode: code, errorDetail: detail });
-    }
-  }, [refresh]);
-
   // --- Email auth ---
   // signInWithEmail: caller handles errors via try/catch for inline form feedback
   const signInWithEmail = useCallback(async (email: string, password: string) => {
@@ -264,13 +208,6 @@ export const AppProvider = ({ children }: { children: ReactNode }) => {
   }, []);
 
   // --- App bootstrap ---
-  // Important ordering of checks (the cause of the "empty account on first
-  // open, real account after 3-5 retries" symptom):
-  //   1. Wait up to 3s for the Telegram SDK script to load (it's loaded from
-  //      telegram.org and on slow networks may not be ready when React mounts).
-  //   2. If we ARE in Telegram, always re-authenticate via initData (ignore
-  //      any cached email/Supabase session in localStorage).
-  //   3. If we are NOT in Telegram, restore any persisted email session.
   useEffect(() => {
     try { setOnboardedState(localStorage.getItem(ONBOARD_KEY) === "1"); } catch {}
 
@@ -281,9 +218,6 @@ export const AppProvider = ({ children }: { children: ReactNode }) => {
         await refreshAdmin(session.user.id);
         await refresh();
       } else if (evt === "SIGNED_OUT") {
-        // Ignore the SIGNED_OUT that fires when we wipe the local session
-        // at the start of Telegram re-authentication (bootstrap phase).
-        if (bootstrappingRef.current) return;
         setAuth({ status: "unauthenticated" });
         setIsAdminState(false);
         setChallenges([]);
@@ -292,49 +226,18 @@ export const AppProvider = ({ children }: { children: ReactNode }) => {
 
     (async () => {
       try {
-        // Step 1: wait up to 3s for Telegram's signed initData to appear.
-        // window.Telegram.WebApp is created by the SDK script in ANY browser,
-        // so checking for its mere existence (waitForTelegramSdk) always
-        // returns true — even in a regular desktop browser. initData is the
-        // ONLY reliable signal: it is a non-empty signed string exclusively
-        // when we run inside a real Telegram Mini App WebView.
-        const initData = await waitForInitData(3000);
-        console.info("[TeamReach] initData present =", !!initData);
-
-        if (initData) {
-          // Step 2: inside Telegram Mini App → always re-auth via initData.
-          // This guarantees the session always belongs to the current Telegram
-          // user, even if a different account was previously cached.
-          //
-          // Wipe any stale Supabase session from localStorage first so that
-          // an old email session doesn't silently poison RLS queries.
-          // The SIGNED_OUT event that fires here is suppressed by bootstrappingRef.
-          try {
-            await supabase.auth.signOut({ scope: "local" });
-          } catch { /* signOut errors are non-fatal */ }
-          await signInWithTelegram();
-        } else {
-          // Step 3: regular browser → restore persisted email session if any.
-          const { data } = await supabase.auth.getSession();
-          if (data.session?.user) {
-            setAuth({ status: "authenticated", userId: data.session.user.id });
-            await refreshAdmin(data.session.user.id);
-            await refresh();
-          } else {
-            setAuth({ status: "unauthenticated" });
-          }
-        }
-      } catch (e) {
-        console.error("[TeamReach] Auth initialization failed:", e);
-        // Last-ditch: try Telegram auth if SDK loaded after the timeout
-        if (isInTelegram()) {
-          await signInWithTelegram();
+        // Restore persisted email session if any
+        const { data } = await supabase.auth.getSession();
+        if (data.session?.user) {
+          setAuth({ status: "authenticated", userId: data.session.user.id });
+          await refreshAdmin(data.session.user.id);
+          await refresh();
         } else {
           setAuth({ status: "unauthenticated" });
         }
-      } finally {
-        // Bootstrap complete — SIGNED_OUT events from here on are real sign-outs
-        bootstrappingRef.current = false;
+      } catch (e) {
+        console.error("[TeamReach] Auth initialization failed:", e);
+        setAuth({ status: "unauthenticated" });
       }
     })();
 
@@ -417,14 +320,10 @@ export const AppProvider = ({ children }: { children: ReactNode }) => {
   // No-op: roles are managed server-side only. Kept for backwards compat.
   const setIsAdmin = (_v: boolean) => {};
 
-  // Suppress unused-import warning for getInitData / getTelegram (re-exported
-  // for potential external use; kept here so future code can import directly).
-  void getInitData; void getTelegram;
-
   return (
     <AppContext.Provider
       value={{
-        auth, signInWithTelegram, signInWithEmail, signUpWithEmail, signOut,
+        auth, signInWithEmail, signUpWithEmail, signOut,
         onboarded, setOnboarded,
         challenges, refresh,
         addProgress, joinChallenge, createChallenge, deleteChallenge,

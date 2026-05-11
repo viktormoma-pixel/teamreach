@@ -1,20 +1,14 @@
 import { useMemo, useState } from "react";
-import { useApp, type AuthErrorCode } from "@/store/app";
+import { type AuthErrorCode } from "@/store/app";
 import { useI18n } from "@/i18n";
 import { Button } from "@/components/ui/button";
 import {
   Accordion, AccordionContent, AccordionItem, AccordionTrigger,
 } from "@/components/ui/accordion";
-import { AlertTriangle, Check, Copy, Loader2, RefreshCw, Send } from "lucide-react";
+import { AlertTriangle, Check, Copy, RefreshCw } from "lucide-react";
 import { toast } from "sonner";
 
-const BOT_USERNAME = (import.meta.env.VITE_TELEGRAM_BOT_USERNAME ?? "").replace(/^@/, "").trim();
-const BOT_URL = BOT_USERNAME ? `https://t.me/${BOT_USERNAME}` : "";
-
 const ICONS: Record<AuthErrorCode, string> = {
-  no_telegram: "📱",
-  invalid_init_data: "🔒",
-  stale_init_data: "⏰",
   network: "📡",
   server: "🛠️",
   session: "🔑",
@@ -65,10 +59,7 @@ export const AuthErrorScreen = ({
   errorCode?: AuthErrorCode;
   errorDetail?: string;
 }) => {
-  const { signInWithTelegram } = useApp();
   const { t } = useI18n();
-  const [retrying, setRetrying] = useState(false);
-  const [linkCopied, setLinkCopied] = useState(false);
   const [diagCopied, setDiagCopied] = useState(false);
 
   const code: AuthErrorCode = errorCode ?? "unknown";
@@ -78,44 +69,16 @@ export const AuthErrorScreen = ({
 
   const sessionId = useMemo(() => getDiagSessionId(), []);
   const diagnostics = useMemo(() => {
-    const tg =
-      // @ts-expect-error injected
-      typeof window !== "undefined" ? window.Telegram?.WebApp : null;
     return [
       `Session: ${sessionId}`,
       `Time: ${new Date().toISOString()}`,
       `Error code: ${code}`,
       `Error detail: ${errorDetail ?? "—"}`,
-      `Bot: ${BOT_USERNAME || "—"}`,
-      `Telegram WebApp: ${tg ? "yes" : "no"}`,
-      `Telegram platform: ${tg?.platform ?? "—"}`,
-      `Telegram version: ${tg?.version ?? "—"}`,
       `Page URL: ${typeof location !== "undefined" ? location.href : "—"}`,
       `User agent: ${typeof navigator !== "undefined" ? navigator.userAgent : "—"}`,
       `Language: ${typeof navigator !== "undefined" ? navigator.language : "—"}`,
     ].join("\n");
   }, [sessionId, code, errorDetail]);
-
-  const onRetry = async () => {
-    setRetrying(true);
-    try {
-      await signInWithTelegram();
-    } finally {
-      setRetrying(false);
-    }
-  };
-
-  const onCopyLink = async () => {
-    if (!BOT_URL) return;
-    const ok = await copyText(BOT_URL);
-    if (ok) {
-      setLinkCopied(true);
-      toast.success(t("auth.linkCopied"));
-      setTimeout(() => setLinkCopied(false), 2000);
-    } else {
-      toast.error(t("auth.copyFailed"));
-    }
-  };
 
   const onCopyDiag = async () => {
     const ok = await copyText(diagnostics);
@@ -144,47 +107,13 @@ export const AuthErrorScreen = ({
           </p>
         </div>
 
-        {code === "no_telegram" ? (
-          <div className="space-y-2">
-            {BOT_URL ? (
-              <>
-                <Button asChild size="lg" className="w-full rounded-2xl h-12 font-semibold">
-                  <a href={BOT_URL} target="_blank" rel="noopener noreferrer">
-                    <Send className="mr-2 h-4 w-4" />
-                    {t("auth.openBot")}
-                  </a>
-                </Button>
-                <Button
-                  variant="secondary"
-                  size="lg"
-                  onClick={onCopyLink}
-                  className="w-full rounded-2xl h-11 font-medium"
-                >
-                  {linkCopied ? (
-                    <><Check className="mr-2 h-4 w-4" />{t("auth.linkCopied")}</>
-                  ) : (
-                    <><Copy className="mr-2 h-4 w-4" />{t("auth.copyLink")}</>
-                  )}
-                </Button>
-              </>
-            ) : (
-              <p className="text-xs text-muted-foreground">{t("auth.botMissing")}</p>
-            )}
-          </div>
-        ) : (
-          <Button
-            onClick={onRetry}
-            disabled={retrying}
-            size="lg"
-            className="w-full rounded-2xl h-12 font-semibold"
-          >
-            {retrying ? (
-              <><Loader2 className="mr-2 h-4 w-4 animate-spin" />{t("auth.retrying")}</>
-            ) : (
-              <><RefreshCw className="mr-2 h-4 w-4" />{t("auth.retry")}</>
-            )}
-          </Button>
-        )}
+        <Button
+          onClick={() => window.location.reload()}
+          size="lg"
+          className="w-full rounded-2xl h-12 font-semibold"
+        >
+          <RefreshCw className="mr-2 h-4 w-4" />{t("auth.retry")}
+        </Button>
 
         {hasError && (
           <Accordion type="single" collapsible className="text-left">

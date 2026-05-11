@@ -6,7 +6,6 @@ import { Input } from "@/components/ui/input";
 import { ArrowLeft, Flame, Users, Calendar, Trash2, Loader2 } from "lucide-react";
 import { toast } from "sonner";
 import { ParticipantsRanking } from "./ParticipantsRanking";
-import { getTelegram } from "@/lib/telegram";
 import {
   AlertDialog, AlertDialogAction, AlertDialogCancel, AlertDialogContent,
   AlertDialogDescription, AlertDialogFooter, AlertDialogHeader, AlertDialogTitle, AlertDialogTrigger,
@@ -55,23 +54,6 @@ export const ChallengeDetail = () => {
     return () => window.clearTimeout(id);
   }, [val, selectedId]);
 
-  // Telegram native BackButton — show on mount, hide on unmount
-  useEffect(() => {
-    const tg = getTelegram() as any;
-    const back = tg?.BackButton;
-    if (!back) return;
-    const handler = () => setSelectedId(null);
-    try {
-      back.show();
-      back.onClick(handler);
-    } catch {}
-    return () => {
-      try {
-        back.offClick(handler);
-        back.hide();
-      } catch {}
-    };
-  }, [setSelectedId]);
 
   const c = challenges.find((x) => x.id === selectedId);
   if (!c) return null;

@@ -4,39 +4,14 @@ import { useI18n } from "@/i18n";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
-import { Loader2, Mail, Lock, Eye, EyeOff, ShieldCheck, Send, Info } from "lucide-react";
+import { Loader2, Mail, Lock, Eye, EyeOff, ShieldCheck } from "lucide-react";
 import { toast } from "sonner";
 
 type Mode = "signin" | "signup";
 
-const BOT_USERNAME = (import.meta.env.VITE_TELEGRAM_BOT_USERNAME ?? "").replace(/^@/, "").trim();
-const BOT_URL = BOT_USERNAME ? `https://t.me/${BOT_USERNAME}` : "";
-
-// Inline i18n strings for the "prefer Telegram" notice. Kept here to avoid
-// editing the large translations.ts dictionary.
-const NOTICE_STRINGS = {
-  en: {
-    title: "Have Telegram? Use that instead",
-    body: "Telegram sign-in syncs your progress and roles automatically. Email creates a separate account that won't be linked to your Telegram one.",
-    openBot: "Open in Telegram",
-  },
-  ru: {
-    title: "Есть Telegram? Лучше войти через него",
-    body: "Вход через Telegram автоматически синхронизирует прогресс и роли. Email создаёт отдельный аккаунт, не связанный с Telegram-аккаунтом.",
-    openBot: "Открыть в Telegram",
-  },
-  de: {
-    title: "Hast du Telegram? Lieber dort anmelden",
-    body: "Die Telegram-Anmeldung synchronisiert deinen Fortschritt und deine Rollen automatisch. E-Mail erstellt ein separates Konto, das nicht mit deinem Telegram-Konto verknüpft ist.",
-    openBot: "In Telegram öffnen",
-  },
-} as const;
-
 export const EmailAuthScreen = () => {
   const { signInWithEmail, signUpWithEmail } = useApp();
-  const { t, lang } = useI18n();
-
-  const notice = NOTICE_STRINGS[lang as keyof typeof NOTICE_STRINGS] ?? NOTICE_STRINGS.en;
+  const { t } = useI18n();
 
   const [mode, setMode] = useState<Mode>("signin");
   const [email, setEmail] = useState("");
@@ -146,29 +121,6 @@ export const EmailAuthScreen = () => {
           <div>
             <h1 className="text-xl font-extrabold">TeamReach</h1>
             <p className="text-sm text-muted-foreground mt-1">{t("email.subtitle")}</p>
-          </div>
-        </div>
-
-        {/* "Prefer Telegram" notice */}
-        <div className="rounded-2xl bg-primary-soft border border-primary/20 px-4 py-3">
-          <div className="flex gap-3 items-start">
-            <Info className="h-4 w-4 text-primary shrink-0 mt-0.5" />
-            <div className="space-y-2 flex-1 min-w-0">
-              <p className="text-sm font-semibold leading-snug">{notice.title}</p>
-              <p className="text-xs text-muted-foreground leading-relaxed">{notice.body}</p>
-              {BOT_URL && (
-                <Button
-                  asChild
-                  size="sm"
-                  className="w-full rounded-xl h-9 mt-1 font-medium"
-                >
-                  <a href={BOT_URL} target="_blank" rel="noopener noreferrer">
-                    <Send className="mr-2 h-3.5 w-3.5" />
-                    {notice.openBot}
-                  </a>
-                </Button>
-              )}
-            </div>
           </div>
         </div>
 

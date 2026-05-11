@@ -6,7 +6,6 @@ import { ChallengeDetail } from "@/components/ChallengeDetail";
 import { Leaderboard } from "@/components/Leaderboard";
 import { Settings } from "@/components/Settings";
 import { TabBar } from "@/components/TabBar";
-import { AuthErrorScreen } from "@/components/AuthErrorScreen";
 import { EmailAuthScreen } from "@/components/EmailAuthScreen";
 
 const Shell = () => {
@@ -25,16 +24,9 @@ const Shell = () => {
     );
   }
 
-  // Unauthenticated: decide which screen to show
+  // Unauthenticated → always show email auth
   if (auth.status === "unauthenticated") {
-    // "no_telegram" means we're in a regular browser → show email auth
-    // No error code (initial load, not in Telegram) → show email auth
-    const showEmailAuth = !auth.errorCode || auth.errorCode === "no_telegram";
-    if (showEmailAuth) {
-      return <EmailAuthScreen />;
-    }
-    // Other Telegram-specific errors (invalid_init_data, stale, network, server…)
-    return <AuthErrorScreen errorCode={auth.errorCode} errorDetail={auth.errorDetail} />;
+    return <EmailAuthScreen />;
   }
 
   // Onboarding
