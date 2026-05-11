@@ -28,8 +28,8 @@ export const Dashboard = () => {
     })();
   }, [auth]);
 
-  const displayName = profile?.first_name || profile?.username || "TeamReach";
-  const initial = (profile?.first_name || profile?.username || "T").slice(0, 1).toUpperCase();
+  const displayName = profile?.username || profile?.first_name || "TeamReach";
+  const initial = (profile?.username || profile?.first_name || "T").slice(0, 1).toUpperCase();
 
   return (
     <div className="px-5 pt-12 pb-32">

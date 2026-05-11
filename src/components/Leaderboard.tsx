@@ -32,7 +32,7 @@ export const Leaderboard = () => {
         const prof = profById.get(user_id);
         return {
           user_id,
-          name: prof?.first_name || prof?.username || "User",
+          name: prof?.username || prof?.first_name || "User",
           photo_url: prof?.photo_url,
           score,
           you: user_id === me,

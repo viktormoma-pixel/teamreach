@@ -7,11 +7,13 @@ import {
   AlertDialog, AlertDialogAction, AlertDialogCancel, AlertDialogContent,
   AlertDialogDescription, AlertDialogFooter, AlertDialogHeader, AlertDialogTitle, AlertDialogTrigger,
 } from "@/components/ui/alert-dialog";
-import { ChevronRight, Shield, FileText, Mail, Trash2, ShieldCheck, Languages, Loader2, LogOut } from "lucide-react";
+import { ChevronRight, Shield, FileText, Mail, Trash2, ShieldCheck, Languages, Loader2, LogOut, User, Check } from "lucide-react";
 import { useEffect, useState } from "react";
 import { toast } from "sonner";
 import { supabase } from "@/integrations/supabase/client";
 import { useNavigate } from "react-router-dom";
+import { Input } from "@/components/ui/input";
+import { Button } from "@/components/ui/button";
 
 const Row = ({ icon: Icon, label, hint, right, onClick }: any) => (
   <button
@@ -40,6 +42,8 @@ export const Settings = () => {
     email?: string | null;
   } | null>(null);
   const [deleting, setDeleting] = useState(false);
+  const [nickname, setNickname] = useState("");
+  const [savingNick, setSavingNick] = useState(false);
 
   const userId = auth.status === "authenticated" ? auth.userId : null;
 
@@ -52,8 +56,35 @@ export const Settings = () => {
         .eq("id", userId)
         .maybeSingle();
       setProfile(data ?? null);
+      setNickname(data?.username ?? data?.first_name ?? "");
     })();
   }, [userId]);
+
+  const handleSaveNickname = async () => {
+    if (!userId) return;
+    const value = nickname.trim();
+    if (!value) {
+      toast.error(t("set.nicknameEmpty"));
+      return;
+    }
+    setSavingNick(true);
+    try {
+      const { error } = await supabase
+        .from("profiles")
+        .update({ username: value })
+        .eq("id", userId);
+      if (error) throw error;
+      setProfile((p) => ({ ...(p ?? {}), username: value }));
+      toast.success(t("set.nicknameSaved"));
+    } catch (e) {
+      toast.error(e instanceof Error ? e.message : "Failed");
+    } finally {
+      setSavingNick(false);
+    }
+  };
+
+  const currentNick = profile?.username ?? profile?.first_name ?? "";
+  const nickChanged = nickname.trim() !== currentNick.trim();
 
   const handleDelete = async () => {
     setDeleting(true);
@@ -85,12 +116,38 @@ export const Settings = () => {
           <img src={profile.photo_url} alt="" className="h-14 w-14 rounded-full object-cover" />
         ) : (
           <div className="h-14 w-14 rounded-full bg-background/20 grid place-items-center text-xl font-extrabold">
-            {(profile?.first_name || profile?.username || profile?.email || "?").slice(0, 1).toUpperCase()}
+            {(profile?.username || profile?.first_name || profile?.email || "?").slice(0, 1).toUpperCase()}
           </div>
         )}
         <div className="flex-1 min-w-0">
-          <p className="font-bold truncate">{profile?.first_name || profile?.username || profile?.email || "User"}</p>
+          <p className="font-bold truncate">{profile?.username || profile?.first_name || profile?.email || "User"}</p>
           <p className="text-sm opacity-80 truncate">{profileSubline}</p>
+        </div>
+      </div>
+
+      <h2 className="mt-8 mb-2 text-xs font-bold uppercase tracking-wider text-muted-foreground px-2">{t("set.profile")}</h2>
+      <div className="rounded-3xl bg-card border border-border overflow-hidden shadow-soft p-4">
+        <div className="flex items-center gap-2 mb-2">
+          <User className="h-4 w-4 text-primary" />
+          <p className="text-sm font-semibold">{t("set.nickname")}</p>
+        </div>
+        <p className="text-xs text-muted-foreground mb-3">{t("set.nicknameHint")}</p>
+        <div className="flex gap-2">
+          <Input
+            value={nickname}
+            onChange={(e) => setNickname(e.target.value)}
+            placeholder={t("set.nicknamePlaceholder")}
+            maxLength={32}
+            className="rounded-xl h-11 flex-1"
+            disabled={savingNick}
+          />
+          <Button
+            onClick={handleSaveNickname}
+            disabled={savingNick || !nickChanged || !nickname.trim()}
+            className="rounded-xl h-11 px-4"
+          >
+            {savingNick ? <Loader2 className="h-4 w-4 animate-spin" /> : <Check className="h-4 w-4" />}
+          </Button>
         </div>
       </div>
 

@@ -136,7 +136,7 @@ export const AppProvider = ({ children }: { children: ReactNode }) => {
         .map((p) => {
           const prof = profilesById.get(p.user_id);
           return {
-            name: prof?.first_name || prof?.username || "User",
+            name: prof?.username || prof?.first_name || "User",
             avatar: prof?.photo_url ?? undefined,
             value: totals.get(p.user_id) ?? 0,
           };
@@ -174,7 +174,11 @@ export const AppProvider = ({ children }: { children: ReactNode }) => {
 
   // signUpWithEmail: throws EMAIL_CONFIRMATION_REQUIRED if Supabase requires email verify
   const signUpWithEmail = useCallback(async (email: string, password: string) => {
-    const { data, error } = await supabase.auth.signUp({ email, password });
+    const { data, error } = await supabase.auth.signUp({
+      email,
+      password,
+      options: { emailRedirectTo: `${window.location.origin}/` },
+    });
     if (error) throw error;
     if (!data.session) {
       // Email confirmation is enabled in Supabase → user must verify email first
