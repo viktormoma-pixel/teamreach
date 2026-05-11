@@ -13,28 +13,10 @@ export type NewChallengeInput = {
   surface?: Challenge["surface"];
 };
 
-export type AuthErrorCode =
-  | "network"
-  | "server"
-  | "session"
-  | "unknown";
-
 type AuthState =
   | { status: "loading" }
-  | { status: "unauthenticated"; errorCode?: AuthErrorCode; errorDetail?: string }
+  | { status: "unauthenticated" }
   | { status: "authenticated"; userId: string };
-
-export function classifyAuthError(raw: unknown): { code: AuthErrorCode; detail: string } {
-  const detail = raw instanceof Error ? raw.message : typeof raw === "string" ? raw : "Unknown error";
-  const m = detail.toLowerCase();
-  if (m.includes("failed to fetch") || m.includes("networkerror") || m.includes("network"))
-    return { code: "network", detail };
-  if (m.includes("session") || m.includes("setsession") || m.includes("verify"))
-    return { code: "session", detail };
-  if (m.includes("500") || m.includes("server") || m.includes("function"))
-    return { code: "server", detail };
-  return { code: "unknown", detail };
-}
 
 type AppContextValue = {
   auth: AuthState;
