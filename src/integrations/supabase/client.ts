@@ -13,8 +13,6 @@ export const supabase = createClient<Database>(SUPABASE_URL, SUPABASE_PUBLISHABL
     storage: localStorage,
     persistSession: true,
     autoRefreshToken: true,
-    // We only use email/password — disable URL hash parsing so Telegram's
-    // `#tgWebAppData=...` payload can't confuse the auth flow.
-    detectSessionInUrl: false,
+    detectSessionInUrl: true,
   }
 });

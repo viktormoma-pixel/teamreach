@@ -1,4 +1,4 @@
-import { createContext, useContext, useEffect, useState, useCallback, ReactNode } from "react";
+import { createContext, useContext, useEffect, useState, useCallback, useRef, ReactNode } from "react";
 import { supabase } from "@/integrations/supabase/client";
 import type { Challenge, Participant } from "@/data/challenges";
 
@@ -104,11 +104,16 @@ export const AppProvider = ({ children }: { children: ReactNode }) => {
     setIsAdminState(!!data?.some((r) => r.role === "admin"));
   }, []);
 
+  // Per-call token: lets us discard results from stale concurrent refreshes.
+  const refreshTokenRef = useRef(0);
+
   // --- challenges data fetch ---
   const refresh = useCallback(async () => {
+    const myToken = ++refreshTokenRef.current;
     // Use getSession() — reads from local cache without a network round-trip.
     const { data: { session } } = await supabase.auth.getSession();
     if (!session?.user) return;
+    if (myToken !== refreshTokenRef.current) return;
     const me = session.user.id;
 
     const { data: chs, error: chErr } = await supabase
@@ -116,7 +121,12 @@ export const AppProvider = ({ children }: { children: ReactNode }) => {
       .select("*")
       .order("created_at", { ascending: false });
     if (chErr) console.error("[TeamReach] challenges fetch failed:", chErr);
-    if (!chs) { setChallenges([]); setChallengesReady(true); return; }
+    if (myToken !== refreshTokenRef.current) return;
+    if (!chs) {
+      setChallenges([]);
+      setChallengesReady(true);
+      return;
+    }
 
     const ids = chs.map((c) => c.id);
     const safeIds = ids.length ? ids : ["00000000-0000-0000-0000-000000000000"];
@@ -169,6 +179,7 @@ export const AppProvider = ({ children }: { children: ReactNode }) => {
       };
     });
 
+    if (myToken !== refreshTokenRef.current) return;
     setChallenges(out);
     setChallengesReady(true);
   }, []);
@@ -219,9 +230,19 @@ export const AppProvider = ({ children }: { children: ReactNode }) => {
     try { setOnboardedState(localStorage.getItem(ONBOARD_KEY) === "1"); } catch {}
 
     let cancelled = false;
+    // Dedupe applySession across the explicit getSession() bootstrap and the
+    // INITIAL_SESSION / SIGNED_IN / TOKEN_REFRESHED events for the same user.
+    let lastAppliedUserId: string | null | undefined = undefined;
 
-    const applySession = async (session: Awaited<ReturnType<typeof supabase.auth.getSession>>["data"]["session"]) => {
+    const applySession = async (
+      session: Awaited<ReturnType<typeof supabase.auth.getSession>>["data"]["session"],
+      opts?: { force?: boolean },
+    ) => {
       if (cancelled) return;
+      const nextUserId = session?.user?.id ?? null;
+      if (!opts?.force && nextUserId === lastAppliedUserId) return;
+      lastAppliedUserId = nextUserId;
+
       if (session?.user) {
         setAuth({ status: "authenticated", userId: session.user.id });
         setChallengesReady(false);
@@ -232,17 +253,24 @@ export const AppProvider = ({ children }: { children: ReactNode }) => {
       }
     };
 
-    // Explicit bootstrap: don't rely solely on INITIAL_SESSION — in some in-app
-    // browsers it fires late or not at all, leaving the UI stuck on the loader.
+    // Explicit bootstrap: in some in-app browsers INITIAL_SESSION fires late
+    // or not at all, leaving the UI stuck on the loader.
     supabase.auth.getSession().then(({ data }) => applySession(data.session));
 
     const { data: { subscription } } = supabase.auth.onAuthStateChange(async (evt, session) => {
       if (evt === "PASSWORD_RECOVERY") {
         setPasswordRecovery(true);
+        await applySession(session, { force: true });
+      } else if (evt === "SIGNED_IN" || evt === "INITIAL_SESSION") {
         await applySession(session);
-      } else if (evt === "SIGNED_IN" || evt === "TOKEN_REFRESHED" || evt === "INITIAL_SESSION") {
-        await applySession(session);
+      } else if (evt === "TOKEN_REFRESHED") {
+        // Token refresh doesn't change the user — skip the full refetch.
+        if (session?.user) {
+          lastAppliedUserId = session.user.id;
+          setAuth({ status: "authenticated", userId: session.user.id });
+        }
       } else if (evt === "SIGNED_OUT") {
+        lastAppliedUserId = null;
         setPasswordRecovery(false);
         setAuth({ status: "unauthenticated" });
         setIsAdminState(false);
