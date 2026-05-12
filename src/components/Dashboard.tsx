@@ -12,24 +12,33 @@ export const Dashboard = () => {
   const { challenges, setSelectedId, joinChallenge, isAdmin, auth } = useApp();
   const { t } = useI18n();
   const [createOpen, setCreateOpen] = useState(false);
-  const [profile, setProfile] = useState<{ first_name?: string | null; username?: string | null; photo_url?: string | null } | null>(null);
+  const [profile, setProfile] = useState<{ first_name?: string | null; username?: string | null; photo_url?: string | null; email?: string | null } | null>(null);
   const mine = challenges.filter((c) => c.joined);
   const available = challenges.filter((c) => !c.joined);
 
   useEffect(() => {
     if (auth.status !== "authenticated") return;
     (async () => {
+      const { data: userData } = await supabase.auth.getUser();
+      const authEmail = userData?.user?.email ?? null;
       const { data } = await supabase
         .from("profiles")
-        .select("first_name,username,photo_url")
+        .select("first_name,username,photo_url,email")
         .eq("id", auth.userId)
         .maybeSingle();
-      if (data) setProfile(data);
+      setProfile({
+        first_name: data?.first_name ?? null,
+        username: data?.username ?? null,
+        photo_url: data?.photo_url ?? null,
+        email: data?.email ?? authEmail,
+      });
     })();
   }, [auth]);
 
-  const displayName = profile?.first_name || profile?.username || "TeamReach";
-  const initial = (profile?.first_name || profile?.username || "T").slice(0, 1).toUpperCase();
+  // Greeting falls back to the email local-part, then to a neutral label.
+  const emailLocal = profile?.email ? profile.email.split("@")[0] : null;
+  const displayName = profile?.first_name || profile?.username || emailLocal || "TeamReach";
+  const initial = (profile?.first_name || profile?.username || emailLocal || "T").slice(0, 1).toUpperCase();
 
   return (
     <div className="px-5 pt-12 pb-32">

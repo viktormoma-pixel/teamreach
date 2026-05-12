@@ -104,10 +104,11 @@ export const AppProvider = ({ children }: { children: ReactNode }) => {
     if (!session?.user) return;
     const me = session.user.id;
 
-    const { data: chs } = await supabase
+    const { data: chs, error: chErr } = await supabase
       .from("challenges")
       .select("*")
       .order("created_at", { ascending: false });
+    if (chErr) console.error("[TeamReach] challenges fetch failed:", chErr);
     if (!chs) { setChallenges([]); return; }
 
     const ids = chs.map((c) => c.id);
@@ -193,12 +194,14 @@ export const AppProvider = ({ children }: { children: ReactNode }) => {
   useEffect(() => {
     try { setOnboardedState(localStorage.getItem(ONBOARD_KEY) === "1"); } catch {}
 
-    // Listen for ongoing auth events (new sign-ins, token refresh, sign-out)
+    // Listen for ongoing auth events (initial session, new sign-ins, token refresh, sign-out)
     const { data: { subscription } } = supabase.auth.onAuthStateChange(async (evt, session) => {
-      if ((evt === "SIGNED_IN" || evt === "TOKEN_REFRESHED") && session?.user) {
+      if ((evt === "SIGNED_IN" || evt === "TOKEN_REFRESHED" || evt === "INITIAL_SESSION") && session?.user) {
         setAuth({ status: "authenticated", userId: session.user.id });
         await refreshAdmin(session.user.id);
         await refresh();
+      } else if (evt === "INITIAL_SESSION" && !session) {
+        setAuth({ status: "unauthenticated" });
       } else if (evt === "SIGNED_OUT") {
         setAuth({ status: "unauthenticated" });
         setIsAdminState(false);
@@ -206,22 +209,9 @@ export const AppProvider = ({ children }: { children: ReactNode }) => {
       }
     });
 
-    (async () => {
-      try {
-        // Restore persisted email session if any
-        const { data } = await supabase.auth.getSession();
-        if (data.session?.user) {
-          setAuth({ status: "authenticated", userId: data.session.user.id });
-          await refreshAdmin(data.session.user.id);
-          await refresh();
-        } else {
-          setAuth({ status: "unauthenticated" });
-        }
-      } catch (e) {
-        console.error("[TeamReach] Auth initialization failed:", e);
-        setAuth({ status: "unauthenticated" });
-      }
-    })();
+    // Note: no manual getSession() bootstrap — supabase-js fires INITIAL_SESSION
+    // on subscribe with the persisted session (or null), which the handler above
+    // turns into either an `authenticated` or `unauthenticated` state.
 
     return () => { subscription.unsubscribe(); };
     // eslint-disable-next-line react-hooks/exhaustive-deps

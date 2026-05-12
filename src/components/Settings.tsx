@@ -46,12 +46,24 @@ export const Settings = () => {
   useEffect(() => {
     if (!userId) { setProfile(null); return; }
     (async () => {
-      const { data } = await supabase
+      // Always fetch the authoritative email from the auth session so we have a
+      // fallback if the `profiles` SELECT comes back empty (race, RLS, etc).
+      const { data: userData } = await supabase.auth.getUser();
+      const authEmail = userData?.user?.email ?? null;
+
+      const { data, error } = await supabase
         .from("profiles")
         .select("first_name,username,photo_url,email")
         .eq("id", userId)
         .maybeSingle();
-      setProfile(data ?? null);
+      if (error) console.error("[TeamReach] profile fetch failed:", error);
+
+      setProfile({
+        first_name: data?.first_name ?? null,
+        username: data?.username ?? null,
+        photo_url: data?.photo_url ?? null,
+        email: data?.email ?? authEmail,
+      });
     })();
   }, [userId]);
 
