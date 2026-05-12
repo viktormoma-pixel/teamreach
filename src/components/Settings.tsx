@@ -141,7 +141,7 @@ export const Settings = () => {
       <div className="rounded-3xl bg-card border border-border divide-y divide-border overflow-hidden shadow-soft">
         <Row icon={Shield} label={t("set.privacy")} hint={t("set.privacyHint")} onClick={() => navigate("/privacy")} />
         <Row icon={FileText} label={t("set.impressum")} hint={t("set.impressumHint")} onClick={() => navigate("/impressum")} />
-        <Row icon={Mail} label={t("set.contactDpo")} hint="datenschutz@teamreach.app" onClick={() => { window.location.href = "mailto:datenschutz@teamreach.app"; }} />
+        <Row icon={Mail} label={t("set.contactDpo")} hint="viktormoma@gmail.com" onClick={() => { window.location.href = "mailto:viktormoma@gmail.com"; }} />
       </div>
 
       <h2 className="mt-8 mb-2 text-xs font-bold uppercase tracking-wider text-muted-foreground px-2">{t("set.yourData")}</h2>
