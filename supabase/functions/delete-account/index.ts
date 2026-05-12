@@ -2,20 +2,29 @@
 // All FK on delete cascade rows (profile, participants, progress) are wiped automatically.
 import { createClient } from "https://esm.sh/@supabase/supabase-js@2.45.0";
 
-const ALLOWED = (Deno.env.get("ALLOWED_ORIGINS") ?? "*")
+// Fail-closed CORS: ALLOWED_ORIGINS must be an explicit comma-separated list
+// of https origins in prod. A missing/empty value blocks all cross-origin
+// requests rather than silently opening the function to the world.
+const ALLOWED = (Deno.env.get("ALLOWED_ORIGINS") ?? "")
   .split(",")
   .map((s) => s.trim())
   .filter(Boolean);
 
 function corsHeaders(origin: string | null) {
-  const allowed =
-    ALLOWED.includes("*") || (origin && ALLOWED.includes(origin)) ? origin ?? "*" : ALLOWED[0] ?? "*";
-  return {
-    "Access-Control-Allow-Origin": allowed,
+  // Only echo Origin back when it's on the allowlist. Otherwise omit the
+  // header entirely so the browser rejects the response.
+  const allowed = origin && ALLOWED.includes(origin) ? origin : null;
+  const base: Record<string, string> = {
     "Access-Control-Allow-Headers": "authorization, x-client-info, apikey, content-type",
     "Access-Control-Allow-Methods": "POST, OPTIONS",
     "Vary": "Origin",
   };
+  if (allowed) base["Access-Control-Allow-Origin"] = allowed;
+  return base;
+}
+
+function isOriginAllowed(origin: string | null) {
+  return !!(origin && ALLOWED.includes(origin));
 }
 
 function json(body: unknown, status: number, origin: string | null) {
@@ -27,6 +36,15 @@ function json(body: unknown, status: number, origin: string | null) {
 
 Deno.serve(async (req) => {
   const origin = req.headers.get("origin");
+
+  if (ALLOWED.length === 0) {
+    // Misconfigured deployment — refuse rather than fall back to "*".
+    return json({ error: "server misconfigured: ALLOWED_ORIGINS not set" }, 500, origin);
+  }
+  if (!isOriginAllowed(origin)) {
+    return json({ error: "origin not allowed" }, 403, origin);
+  }
+
   if (req.method === "OPTIONS") return new Response(null, { status: 204, headers: corsHeaders(origin) });
   if (req.method !== "POST") return json({ error: "method not allowed" }, 405, origin);
 

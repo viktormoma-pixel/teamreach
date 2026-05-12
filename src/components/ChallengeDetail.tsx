@@ -71,7 +71,14 @@ export const ChallengeDetail = () => {
       setSavedDraft(false);
       toast.success(t("cd.added", { n, unit: c.unit }));
     } catch (e) {
-      toast.error(e instanceof Error ? e.message : "Failed");
+      const code = e instanceof Error ? e.message : "";
+      if (code === "PROGRESS_DAILY_CAP") {
+        toast.error(t("cd.errDailyCap"));
+      } else if (code === "PROGRESS_DAILY_TOTAL") {
+        toast.error(t("cd.errDailyTotal"));
+      } else {
+        toast.error(code || "Failed");
+      }
     }
   };
 

@@ -22,6 +22,7 @@ type AppContextValue = {
   auth: AuthState;
   signInWithEmail: (email: string, password: string) => Promise<void>;
   signUpWithEmail: (email: string, password: string) => Promise<void>;
+  resendConfirmation: (email: string) => Promise<void>;
   sendPasswordReset: (email: string) => Promise<void>;
   updatePassword: (password: string) => Promise<void>;
   passwordRecovery: boolean;
@@ -54,11 +55,19 @@ const ONBOARD_KEY = "teamreach.onboarded";
 
 // --- helpers ----------------------------------------------------------------
 
-// BUG FIX: removed unused `userId` param that was never used inside the function
+// Buckets the last 7 calendar days (in the user's local TZ) of progress
+// entries by weekday. The cutoff is the start of "today - 6 days" so the
+// returned week always spans exactly 7 calendar days regardless of the
+// current time of day — avoids the off-by-one drift the wall-clock cutoff
+// caused near midnight.
 function buildHistory(entries: { day: string; amount: number; created_at: string }[]) {
   const buckets: Record<string, number> = {};
   WEEKDAYS.forEach((d) => (buckets[d] = 0));
-  const cutoff = Date.now() - 7 * 24 * 60 * 60 * 1000;
+
+  const startOfToday = new Date();
+  startOfToday.setHours(0, 0, 0, 0);
+  const cutoff = startOfToday.getTime() - 6 * 24 * 60 * 60 * 1000;
+
   for (const e of entries) {
     const ts = new Date(e.created_at).getTime();
     if (ts < cutoff) continue;
@@ -211,6 +220,12 @@ export const AppProvider = ({ children }: { children: ReactNode }) => {
     // Session returned → SIGNED_IN event fires and handles the rest
   }, []);
 
+  // --- Resend confirmation email ---
+  const resendConfirmation = useCallback(async (email: string) => {
+    const { error } = await supabase.auth.resend({ type: "signup", email });
+    if (error) throw error;
+  }, []);
+
   // --- Password reset ---
   const sendPasswordReset = useCallback(async (email: string) => {
     const { error } = await supabase.auth.resetPasswordForEmail(email, {
@@ -280,12 +295,16 @@ export const AppProvider = ({ children }: { children: ReactNode }) => {
     // or not at all, leaving the UI stuck on the loader.
     supabase.auth.getSession().then(({ data }) => applySession(data.session));
 
-    const { data: { subscription } } = supabase.auth.onAuthStateChange(async (evt, session) => {
+    // Supabase documents that calling any supabase.* method synchronously
+    // inside this callback can deadlock the auth client — especially in
+    // in-app WebViews (Telegram, iOS Safari). Defer all async work to a
+    // microtask via setTimeout(0); keep only synchronous state updates inline.
+    const { data: { subscription } } = supabase.auth.onAuthStateChange((evt, session) => {
       if (evt === "PASSWORD_RECOVERY") {
         setPasswordRecovery(true);
-        await applySession(session, { force: true });
+        setTimeout(() => { void applySession(session, { force: true }); }, 0);
       } else if (evt === "SIGNED_IN" || evt === "INITIAL_SESSION") {
-        await applySession(session);
+        setTimeout(() => { void applySession(session); }, 0);
       } else if (evt === "TOKEN_REFRESHED") {
         // Token refresh doesn't change the user — skip the full refetch.
         if (session?.user) {
@@ -314,25 +333,46 @@ export const AppProvider = ({ children }: { children: ReactNode }) => {
     const { error } = await supabase.from("progress_entries").insert({
       challenge_id: id, user_id: user.id, amount, day,
     });
-    if (error) throw error;
+    if (error) {
+      // Map server-side abuse-limit raises to stable error codes the UI can
+      // translate. The Postgres trigger raises with errcode=23514 (check_violation).
+      const msg = String(error.message || "");
+      if (msg.includes("progress_daily_cap_exceeded")) {
+        throw new Error("PROGRESS_DAILY_CAP");
+      }
+      if (msg.includes("progress_daily_total_exceeded")) {
+        throw new Error("PROGRESS_DAILY_TOTAL");
+      }
+      throw error;
+    }
     await refresh();
   };
 
   const joinChallenge = async (id: string) => {
     const { data: { user } } = await supabase.auth.getUser();
     if (!user) return;
-    // Optimistic update
-    setChallenges((prev) =>
-      prev.map((c) => c.id === id ? { ...c, joined: true, members: c.members + 1 } : c)
-    );
+
+    // Skip optimistic bump if the user is already joined — otherwise a
+    // duplicate insert leaves members count inflated until refresh().
+    const alreadyJoined = challenges.find((c) => c.id === id)?.joined === true;
+
+    if (!alreadyJoined) {
+      setChallenges((prev) =>
+        prev.map((c) => c.id === id ? { ...c, joined: true, members: c.members + 1 } : c)
+      );
+    }
+
     const { error } = await supabase
       .from("challenge_participants")
       .insert({ challenge_id: id, user_id: user.id });
+
     if (error && !String(error.message).includes("duplicate")) {
-      // Rollback
-      setChallenges((prev) =>
-        prev.map((c) => c.id === id ? { ...c, joined: false, members: Math.max(0, c.members - 1) } : c)
-      );
+      if (!alreadyJoined) {
+        // Rollback only the increment we applied.
+        setChallenges((prev) =>
+          prev.map((c) => c.id === id ? { ...c, joined: false, members: Math.max(0, c.members - 1) } : c)
+        );
+      }
       throw error;
     }
     await refresh();
@@ -364,7 +404,13 @@ export const AppProvider = ({ children }: { children: ReactNode }) => {
   };
 
   const deleteChallenge = async (id: string) => {
-    const { error } = await supabase.from("challenges").delete().eq("id", id);
+    // Soft-delete: marking archived_at hides the challenge from RLS reads but
+    // keeps participants + progress rows intact. A future "restore" UI can
+    // unset archived_at to recover the challenge.
+    const { error } = await supabase
+      .from("challenges")
+      .update({ archived_at: new Date().toISOString() })
+      .eq("id", id);
     if (error) throw error;
     setSelectedId(null);
     await refresh();
@@ -384,7 +430,7 @@ export const AppProvider = ({ children }: { children: ReactNode }) => {
   return (
     <AppContext.Provider
       value={{
-        auth, signInWithEmail, signUpWithEmail, sendPasswordReset, updatePassword,
+        auth, signInWithEmail, signUpWithEmail, resendConfirmation, sendPasswordReset, updatePassword,
         passwordRecovery, exitPasswordRecovery, signOut,
         onboarded, setOnboarded,
         challenges, challengesReady, refresh,

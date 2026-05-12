@@ -1,16 +1,14 @@
 # TeamReach Challenge
 
-Telegram Mini App для совместных челленджей в команде или семье. Создавайте общие цели, отмечайте прогресс, соревнуйтесь в рейтинге.
+Веб-приложение для совместных челленджей в команде или семье. Создавайте общие цели, отмечайте прогресс, соревнуйтесь в рейтинге. Работает как в обычном браузере, так и встроенным во внешние WebView (включая Telegram).
 
-Поддерживается два сценария входа:
-- **Telegram WebApp** — автоматическая авторизация через `initData` (HMAC-SHA256)
-- **Email / пароль** — для использования в обычном браузере
+Авторизация: **email / пароль** через Supabase Auth, с подтверждением email и сбросом пароля. (Telegram WebApp `initData`-флоу был удалён — приложение теперь email-only.)
 
 ## Tech stack
 
 - **Frontend:** React + Vite + TypeScript + Tailwind CSS + shadcn/ui
 - **Backend:** Supabase (Postgres + Edge Functions на Deno)
-- **Auth:** Telegram WebApp `initData` → Supabase session, или Supabase email/password
+- **Auth:** Supabase email/password
 
 ## Быстрый старт
 
@@ -30,15 +28,23 @@ npm run dev            # http://localhost:8080
 |---|---|
 | `VITE_SUPABASE_URL` | Supabase Dashboard → Project Settings → API |
 | `VITE_SUPABASE_PUBLISHABLE_KEY` | Supabase Dashboard → Project Settings → API (anon key) |
-| `VITE_TELEGRAM_BOT_USERNAME` | Username бота без `@`, для кнопки "Открыть в Telegram" |
 
 Edge-функции получают секреты через `supabase secrets set`:
 
 ```bash
-supabase secrets set TELEGRAM_BOT_TOKEN=<token>
-supabase secrets set ADMIN_TELEGRAM_IDS=123456789,987654321
+# ОБЯЗАТЕЛЬНО: список разрешённых origin'ов для CORS. Без этого
+# delete-account вернёт 500.
 supabase secrets set ALLOWED_ORIGINS=https://your-domain.com
 ```
+
+## Supabase Auth настройки (важно перед запуском)
+
+В Supabase Dashboard → Authentication:
+
+1. **URL Configuration** — добавьте прод-домен в `Site URL` и `Redirect URLs`, иначе ссылки сброса пароля и подтверждения email будут битыми.
+2. **Email Auth** — включите `Enable email confirmations`.
+3. **CAPTCHA** — рекомендуется включить hCaptcha / Turnstile, чтобы предотвратить массовую регистрацию ботами.
+4. **Rate limits** — оставить дефолтные или ужесточить под нагрузку.
 
 ## База данных
 
@@ -50,32 +56,30 @@ supabase db push
 
 или вручную в Supabase Dashboard → SQL Editor.
 
+Что важно в миграциях:
+- RLS включён на всех таблицах
+- `profiles.email` скрыт column-level grants — другие пользователи его не видят
+- `progress_entries` имеет триггеры дневных лимитов (50 записей и 10 000 единиц на пользователя на челлендж в сутки) — анти-абуз лидерборда
+- `challenges.archived_at` — soft-delete: «удалённые» челленджи остаются в БД и могут быть восстановлены
+
 ## Edge Functions
 
 ```bash
-supabase functions deploy telegram-auth
 supabase functions deploy delete-account
 ```
 
-## Telegram setup
-
-1. Откройте [@BotFather](https://t.me/BotFather) → `/newbot` → получите `TELEGRAM_BOT_TOKEN`.
-2. Создайте Mini App: `/newapp` → укажите публичный HTTPS URL приложения.
-3. Ссылка для входа: `t.me/<bot_username>/<app_short_name>`.
-4. Для тестирования локально используйте [ngrok](https://ngrok.com/): `ngrok http 8080`.
+`delete-account` — POST-эндпоинт, валидирует JWT пользователя и через service-role удаляет аккаунт из `auth.users` (всё каскадно подчищается). Требует обязательно установленного `ALLOWED_ORIGINS`.
 
 ## Роли
 
 | Роль | Возможности |
 |---|---|
 | `user` (участник) | Просматривать и вступать в челленджи, добавлять прогресс |
-| `admin` | Всё из `user` + создавать и удалять челленджи |
+| `admin` | Всё из `user` + создавать и архивировать челленджи |
 
-### Назначение прав
+### Назначение admin-роли
 
-**Telegram-пользователи:** добавьте Telegram ID в секрет `ADMIN_TELEGRAM_IDS` — роль назначится автоматически при следующем входе. ID можно узнать у [@userinfobot](https://t.me/userinfobot).
-
-**Email-пользователи:** выполните в Supabase SQL Editor:
+Выполните в Supabase SQL Editor:
 
 ```sql
 INSERT INTO public.user_roles (user_id, role)
@@ -88,3 +92,7 @@ ON CONFLICT (user_id, role) DO NOTHING;
 ```bash
 npm run build   # TypeScript check + Vite build → dist/
 ```
+
+## Deploy на Vercel
+
+[vercel.json](vercel.json) уже содержит SPA-rewrite и security-заголовки (CSP, HSTS, Referrer-Policy, Permissions-Policy). CSP пропускает соединения только на `*.supabase.co` и разрешает встраивание в `web.telegram.org` / `t.me`. Если меняется backend — обновите `connect-src`.

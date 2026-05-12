@@ -1,4 +1,4 @@
-import { useState } from "react";
+import { useState, useEffect } from "react";
 import { useApp } from "@/store/app";
 import { useI18n } from "@/i18n";
 import { Button } from "@/components/ui/button";
@@ -11,7 +11,7 @@ import { toast } from "sonner";
 type Mode = "signin" | "signup" | "forgot";
 
 export const EmailAuthScreen = () => {
-  const { signInWithEmail, signUpWithEmail, sendPasswordReset } = useApp();
+  const { signInWithEmail, signUpWithEmail, resendConfirmation, sendPasswordReset } = useApp();
   const { t } = useI18n();
 
   const [mode, setMode] = useState<Mode>("signin");
@@ -22,6 +22,7 @@ export const EmailAuthScreen = () => {
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [confirmationSent, setConfirmationSent] = useState(false);
+  const [resendCooldown, setResendCooldown] = useState(0);
   const [resetSentTo, setResetSentTo] = useState<string | null>(null);
   const [acceptTerms, setAcceptTerms] = useState(false);
   const [acceptPrivacy, setAcceptPrivacy] = useState(false);
@@ -104,6 +105,27 @@ export const EmailAuthScreen = () => {
     }
   };
 
+  // 30-second cooldown after a resend to prevent spamming Supabase rate limits.
+  useEffect(() => {
+    if (resendCooldown <= 0) return;
+    const id = window.setTimeout(() => setResendCooldown((s) => s - 1), 1000);
+    return () => window.clearTimeout(id);
+  }, [resendCooldown]);
+
+  const handleResend = async () => {
+    if (resendCooldown > 0 || loading) return;
+    setLoading(true);
+    try {
+      await resendConfirmation(email.trim());
+      toast.success(t("email.confirmResent"));
+      setResendCooldown(30);
+    } catch (err) {
+      toast.error(err instanceof Error ? err.message : "Failed");
+    } finally {
+      setLoading(false);
+    }
+  };
+
   // --- Confirmation sent screen ---
   if (confirmationSent) {
     return (
@@ -120,6 +142,16 @@ export const EmailAuthScreen = () => {
           </div>
           <Button
             variant="outline"
+            className="w-full rounded-2xl h-11"
+            onClick={handleResend}
+            disabled={loading || resendCooldown > 0}
+          >
+            {resendCooldown > 0
+              ? t("email.confirmResendIn", { n: resendCooldown })
+              : t("email.confirmResend")}
+          </Button>
+          <Button
+            variant="ghost"
             className="w-full rounded-2xl h-11"
             onClick={() => { setConfirmationSent(false); switchMode("signin"); }}
           >

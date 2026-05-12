@@ -45,6 +45,7 @@ export type Database = {
       }
       challenges: {
         Row: {
+          archived_at: string | null
           created_at: string
           created_by: string | null
           deadline: string
@@ -57,6 +58,7 @@ export type Database = {
           updated_at: string
         }
         Insert: {
+          archived_at?: string | null
           created_at?: string
           created_by?: string | null
           deadline: string
@@ -69,6 +71,7 @@ export type Database = {
           updated_at?: string
         }
         Update: {
+          archived_at?: string | null
           created_at?: string
           created_by?: string | null
           deadline?: string
