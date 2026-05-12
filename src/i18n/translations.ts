@@ -113,6 +113,10 @@ export const translations: Record<Lang, Dict> = {
     "lb.title": "Leaderboard",
     "lb.points": "{n} pts",
     "lb.you": "You",
+    "lb.userChallenges": "Challenges",
+    "lb.totalScore": "Total score",
+    "lb.noChallenges": "No challenges yet",
+    "lb.progressOf": "{score} / {goal} {unit}",
 
     // Settings
     "set.title": "Settings",
@@ -263,6 +267,10 @@ export const translations: Record<Lang, Dict> = {
     "lb.title": "Рейтинг",
     "lb.points": "{n} очк.",
     "lb.you": "Вы",
+    "lb.userChallenges": "Челленджи",
+    "lb.totalScore": "Всего очков",
+    "lb.noChallenges": "Пока нет челленджей",
+    "lb.progressOf": "{score} / {goal} {unit}",
 
     "set.title": "Настройки",
     "set.subtitle": "Управление профилем и приватностью.",
@@ -410,6 +418,10 @@ export const translations: Record<Lang, Dict> = {
     "lb.title": "Rangliste",
     "lb.points": "{n} Pkt.",
     "lb.you": "Du",
+    "lb.userChallenges": "Challenges",
+    "lb.totalScore": "Gesamtpunktzahl",
+    "lb.noChallenges": "Noch keine Challenges",
+    "lb.progressOf": "{score} / {goal} {unit}",
 
     "set.title": "Einstellungen",
     "set.subtitle": "Profil und Privatsphäre verwalten.",

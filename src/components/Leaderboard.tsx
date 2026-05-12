@@ -3,6 +3,7 @@ import { useI18n } from "@/i18n";
 import { Trophy, Medal, RefreshCw } from "lucide-react";
 import { supabase } from "@/integrations/supabase/client";
 import { useApp } from "@/store/app";
+import { UserChallengesSheet } from "./UserChallengesSheet";
 
 type Row = { user_id: string; name: string; photo_url?: string | null; score: number; you: boolean };
 
@@ -11,6 +12,7 @@ export const Leaderboard = () => {
   const { tab } = useApp();
   const [rows, setRows] = useState<Row[]>([]);
   const [loading, setLoading] = useState(true);
+  const [selected, setSelected] = useState<Row | null>(null);
 
   const loadRows = useCallback(async () => {
     setLoading(true);
@@ -93,21 +95,31 @@ export const Leaderboard = () => {
               const isFirst = idx === 0;
               const displayName = p.you ? t("lb.you") : p.name;
               return (
-                <div key={p.user_id} className={`rounded-3xl p-4 text-center ${isFirst ? "bg-gradient-card text-primary-foreground shadow-card" : "bg-card border border-border shadow-soft"}`}>
+                <button
+                  type="button"
+                  onClick={() => setSelected(p)}
+                  key={p.user_id}
+                  className={`rounded-3xl p-4 text-center transition active:scale-95 ${isFirst ? "bg-gradient-card text-primary-foreground shadow-card" : "bg-card border border-border shadow-soft"}`}
+                >
                   <div className={`mx-auto h-12 w-12 rounded-full grid place-items-center ${isFirst ? "bg-background/20" : "bg-primary-soft"}`}>
                     {isFirst ? <Trophy className="h-6 w-6" /> : <Medal className="h-5 w-5 text-primary" />}
                   </div>
                   <p className="mt-2 font-bold text-sm truncate">{displayName}</p>
                   <p className={`text-xs ${isFirst ? "opacity-80" : "text-muted-foreground"}`}>{t("lb.points", { n: p.score })}</p>
                   <p className={`mt-1 text-[10px] font-bold ${isFirst ? "opacity-90" : "text-primary"}`}>#{idx + 1}</p>
-                </div>
+                </button>
               );
             })}
           </div>
 
           <div className="mt-6 rounded-3xl bg-card border border-border divide-y divide-border overflow-hidden shadow-soft">
             {rest.map((p, i) => (
-              <div key={p.user_id} className={`flex items-center gap-4 p-4 ${p.you ? "bg-primary-soft" : ""}`}>
+              <button
+                type="button"
+                onClick={() => setSelected(p)}
+                key={p.user_id}
+                className={`w-full text-left flex items-center gap-4 p-4 transition active:bg-muted ${p.you ? "bg-primary-soft" : ""}`}
+              >
                 <span className="w-6 text-center font-bold text-muted-foreground">{i + 4}</span>
                 <div className="h-10 w-10 rounded-full bg-secondary grid place-items-center font-bold overflow-hidden">
                   {p.photo_url ? <img src={p.photo_url} alt="" className="h-full w-full object-cover" /> : p.name[0]}
@@ -116,11 +128,19 @@ export const Leaderboard = () => {
                   <p className="font-semibold">{p.name}{p.you && <span className="ml-2 text-xs text-primary">{t("lb.you")}</span>}</p>
                   <p className="text-xs text-muted-foreground">{t("lb.points", { n: p.score })}</p>
                 </div>
-              </div>
+              </button>
             ))}
           </div>
         </>
       )}
+
+      <UserChallengesSheet
+        userId={selected?.user_id ?? null}
+        userName={selected ? (selected.you ? t("lb.you") : selected.name) : ""}
+        userPhoto={selected?.photo_url}
+        open={!!selected}
+        onOpenChange={(open) => { if (!open) setSelected(null); }}
+      />
     </div>
   );
 };
