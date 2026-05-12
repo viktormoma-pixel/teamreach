@@ -1,5 +1,5 @@
 import { AppProvider, useApp } from "@/store/app";
-import { I18nProvider, useI18n } from "@/i18n";
+import { useI18n } from "@/i18n";
 import { Onboarding } from "@/components/Onboarding";
 import { Dashboard } from "@/components/Dashboard";
 import { ChallengeDetail } from "@/components/ChallengeDetail";
@@ -50,11 +50,9 @@ const Shell = () => {
 };
 
 const Index = () => (
-  <I18nProvider>
-    <AppProvider>
-      <Shell />
-    </AppProvider>
-  </I18nProvider>
+  <AppProvider>
+    <Shell />
+  </AppProvider>
 );
 
 export default Index;
