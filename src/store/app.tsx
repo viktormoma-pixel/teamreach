@@ -252,12 +252,14 @@ export const AppProvider = ({ children }: { children: ReactNode }) => {
       lastAppliedUserId = nextUserId;
 
       if (session?.user) {
-        // Detect orphan Telegram-era sessions: those users have synthetic
-        // emails ending in @telegram.local and no profile row in the new
-        // email-only schema. Force them to sign in fresh.
+        // Detect orphan / Telegram-era sessions. Those users either have
+        // synthetic @telegram.local emails or no email at all (older Telegram
+        // signInWithIdToken flow), and they have no usable profile row in
+        // the email-only schema. Force them to sign in fresh with email.
         const email = session.user.email ?? "";
-        if (email.endsWith("@telegram.local")) {
-          console.warn("[TeamReach] dropping stale Telegram-era session");
+        const isStale = !email || email.endsWith("@telegram.local");
+        if (isStale) {
+          console.warn("[TeamReach] dropping stale legacy session", { email });
           await supabase.auth.signOut();
           return;
         }
