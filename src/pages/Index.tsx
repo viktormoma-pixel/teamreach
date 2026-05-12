@@ -7,9 +7,10 @@ import { Leaderboard } from "@/components/Leaderboard";
 import { Settings } from "@/components/Settings";
 import { TabBar } from "@/components/TabBar";
 import { EmailAuthScreen } from "@/components/EmailAuthScreen";
+import { UpdatePasswordScreen } from "@/components/UpdatePasswordScreen";
 
 const Shell = () => {
-  const { auth, onboarded, tab, selectedId } = useApp();
+  const { auth, onboarded, tab, selectedId, passwordRecovery } = useApp();
   const { t } = useI18n();
 
   // Loading state
@@ -27,6 +28,11 @@ const Shell = () => {
   // Unauthenticated → always show email auth
   if (auth.status === "unauthenticated") {
     return <EmailAuthScreen />;
+  }
+
+  // Password recovery deep link → force user to set a new password
+  if (passwordRecovery) {
+    return <UpdatePasswordScreen />;
   }
 
   // Onboarding

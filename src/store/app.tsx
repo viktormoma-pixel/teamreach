@@ -22,6 +22,10 @@ type AppContextValue = {
   auth: AuthState;
   signInWithEmail: (email: string, password: string) => Promise<void>;
   signUpWithEmail: (email: string, password: string) => Promise<void>;
+  sendPasswordReset: (email: string) => Promise<void>;
+  updatePassword: (password: string) => Promise<void>;
+  passwordRecovery: boolean;
+  exitPasswordRecovery: () => void;
   signOut: () => Promise<void>;
   onboarded: boolean;
   setOnboarded: (v: boolean) => void;
@@ -84,6 +88,7 @@ export const AppProvider = ({ children }: { children: ReactNode }) => {
   const [selectedId, setSelectedId] = useState<string | null>(null);
   const [tab, setTab] = useState<Tab>("home");
   const [isAdmin, setIsAdminState] = useState(false);
+  const [passwordRecovery, setPasswordRecovery] = useState(false);
 
   const setOnboarded = (v: boolean) => {
     setOnboardedState(v);
@@ -187,6 +192,22 @@ export const AppProvider = ({ children }: { children: ReactNode }) => {
     // Session returned → SIGNED_IN event fires and handles the rest
   }, []);
 
+  // --- Password reset ---
+  const sendPasswordReset = useCallback(async (email: string) => {
+    const { error } = await supabase.auth.resetPasswordForEmail(email, {
+      redirectTo: `${window.location.origin}/`,
+    });
+    if (error) throw error;
+  }, []);
+
+  const updatePassword = useCallback(async (password: string) => {
+    const { error } = await supabase.auth.updateUser({ password });
+    if (error) throw error;
+    setPasswordRecovery(false);
+  }, []);
+
+  const exitPasswordRecovery = useCallback(() => setPasswordRecovery(false), []);
+
   // --- Sign out ---
   const signOut = useCallback(async () => {
     await supabase.auth.signOut();
@@ -216,9 +237,13 @@ export const AppProvider = ({ children }: { children: ReactNode }) => {
     supabase.auth.getSession().then(({ data }) => applySession(data.session));
 
     const { data: { subscription } } = supabase.auth.onAuthStateChange(async (evt, session) => {
-      if (evt === "SIGNED_IN" || evt === "TOKEN_REFRESHED" || evt === "INITIAL_SESSION") {
+      if (evt === "PASSWORD_RECOVERY") {
+        setPasswordRecovery(true);
+        await applySession(session);
+      } else if (evt === "SIGNED_IN" || evt === "TOKEN_REFRESHED" || evt === "INITIAL_SESSION") {
         await applySession(session);
       } else if (evt === "SIGNED_OUT") {
+        setPasswordRecovery(false);
         setAuth({ status: "unauthenticated" });
         setIsAdminState(false);
         setChallenges([]);
@@ -308,7 +333,8 @@ export const AppProvider = ({ children }: { children: ReactNode }) => {
   return (
     <AppContext.Provider
       value={{
-        auth, signInWithEmail, signUpWithEmail, signOut,
+        auth, signInWithEmail, signUpWithEmail, sendPasswordReset, updatePassword,
+        passwordRecovery, exitPasswordRecovery, signOut,
         onboarded, setOnboarded,
         challenges, challengesReady, refresh,
         addProgress, joinChallenge, createChallenge, deleteChallenge,
