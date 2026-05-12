@@ -14,12 +14,15 @@ export function CookieConsentBanner() {
       setVisible(true);
     } else if (stored === "true") {
       mixpanel.opt_in_tracking();
+      mixpanel.track_pageview();
     }
   }, []);
 
   const accept = () => {
     localStorage.setItem(CONSENT_KEY, "true");
     mixpanel.opt_in_tracking();
+    mixpanel.track("analytics_consent_given");
+    mixpanel.track_pageview();
     setVisible(false);
   };
 
