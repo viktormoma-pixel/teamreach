@@ -1,6 +1,7 @@
 import { createContext, useContext, useEffect, useState, useCallback, useRef, ReactNode } from "react";
 import { supabase } from "@/integrations/supabase/client";
 import type { Challenge, Participant } from "@/data/challenges";
+import { mixpanel } from "@/lib/mixpanel";
 
 type Tab = "home" | "leaderboard" | "settings";
 
@@ -211,6 +212,7 @@ export const AppProvider = ({ children }: { children: ReactNode }) => {
       options: captchaToken ? { captchaToken } : undefined,
     });
     if (error) throw error;
+    mixpanel.track("signed_in", { method: "email" });
     // onAuthStateChange (SIGNED_IN) will update auth state, admin, and challenges
   }, []);
 
@@ -225,6 +227,10 @@ export const AppProvider = ({ children }: { children: ReactNode }) => {
       // Email confirmation is enabled in Supabase → user must verify email first
       throw new Error("EMAIL_CONFIRMATION_REQUIRED");
     }
+    // Identify before tracking so sign_up_completed is attributed to this user
+    mixpanel.identify(data.session.user.id);
+    mixpanel.people.set({ $email: email, $created: new Date().toISOString() });
+    mixpanel.track("sign_up_completed", { sign_up_method: "email" });
     // Session returned → SIGNED_IN event fires and handles the rest
   }, []);
 
@@ -291,6 +297,8 @@ export const AppProvider = ({ children }: { children: ReactNode }) => {
           return;
         }
         setAuth({ status: "authenticated", userId: session.user.id });
+        mixpanel.identify(session.user.id);
+        mixpanel.people.set({ $email: session.user.email });
         setChallengesReady(false);
         try {
           await refreshAdmin(session.user.id);
@@ -330,6 +338,7 @@ export const AppProvider = ({ children }: { children: ReactNode }) => {
         setIsAdminState(false);
         setChallenges([]);
         setChallengesReady(false);
+        mixpanel.reset();
       }
     });
 
@@ -357,6 +366,7 @@ export const AppProvider = ({ children }: { children: ReactNode }) => {
       }
       throw error;
     }
+    mixpanel.track("progress_logged", { challenge_id: id, amount });
     await refresh();
   };
 
@@ -387,6 +397,7 @@ export const AppProvider = ({ children }: { children: ReactNode }) => {
       }
       throw error;
     }
+    if (!alreadyJoined) mixpanel.track("challenge_joined", { challenge_id: id });
     await refresh();
   };
 
@@ -412,6 +423,7 @@ export const AppProvider = ({ children }: { children: ReactNode }) => {
     if (ch?.id) {
       await supabase.from("challenge_participants").insert({ challenge_id: ch.id, user_id: user.id });
     }
+    mixpanel.track("challenge_created", { unit: input.unit, goal: input.goal, days: input.daysLeft });
     await refresh();
   };
 
@@ -424,6 +436,7 @@ export const AppProvider = ({ children }: { children: ReactNode }) => {
       .update({ archived_at: new Date().toISOString() })
       .eq("id", id);
     if (error) throw error;
+    mixpanel.track("challenge_deleted", { challenge_id: id });
     setSelectedId(null);
     await refresh();
   };
