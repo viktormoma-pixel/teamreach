@@ -197,15 +197,27 @@ export const AppProvider = ({ children }: { children: ReactNode }) => {
   useEffect(() => {
     try { setOnboardedState(localStorage.getItem(ONBOARD_KEY) === "1"); } catch {}
 
-    // Listen for ongoing auth events (initial session, new sign-ins, token refresh, sign-out)
-    const { data: { subscription } } = supabase.auth.onAuthStateChange(async (evt, session) => {
-      if ((evt === "SIGNED_IN" || evt === "TOKEN_REFRESHED" || evt === "INITIAL_SESSION") && session?.user) {
+    let cancelled = false;
+
+    const applySession = async (session: Awaited<ReturnType<typeof supabase.auth.getSession>>["data"]["session"]) => {
+      if (cancelled) return;
+      if (session?.user) {
         setAuth({ status: "authenticated", userId: session.user.id });
         setChallengesReady(false);
         await refreshAdmin(session.user.id);
         await refresh();
-      } else if (evt === "INITIAL_SESSION" && !session) {
+      } else {
         setAuth({ status: "unauthenticated" });
+      }
+    };
+
+    // Explicit bootstrap: don't rely solely on INITIAL_SESSION — in some in-app
+    // browsers it fires late or not at all, leaving the UI stuck on the loader.
+    supabase.auth.getSession().then(({ data }) => applySession(data.session));
+
+    const { data: { subscription } } = supabase.auth.onAuthStateChange(async (evt, session) => {
+      if (evt === "SIGNED_IN" || evt === "TOKEN_REFRESHED" || evt === "INITIAL_SESSION") {
+        await applySession(session);
       } else if (evt === "SIGNED_OUT") {
         setAuth({ status: "unauthenticated" });
         setIsAdminState(false);
@@ -214,11 +226,7 @@ export const AppProvider = ({ children }: { children: ReactNode }) => {
       }
     });
 
-    // Note: no manual getSession() bootstrap — supabase-js fires INITIAL_SESSION
-    // on subscribe with the persisted session (or null), which the handler above
-    // turns into either an `authenticated` or `unauthenticated` state.
-
-    return () => { subscription.unsubscribe(); };
+    return () => { cancelled = true; subscription.unsubscribe(); };
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
 
