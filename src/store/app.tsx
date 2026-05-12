@@ -110,78 +110,86 @@ export const AppProvider = ({ children }: { children: ReactNode }) => {
   // --- challenges data fetch ---
   const refresh = useCallback(async () => {
     const myToken = ++refreshTokenRef.current;
-    // Use getSession() — reads from local cache without a network round-trip.
-    const { data: { session } } = await supabase.auth.getSession();
-    if (!session?.user) return;
-    if (myToken !== refreshTokenRef.current) return;
-    const me = session.user.id;
+    const isLatest = () => myToken === refreshTokenRef.current;
 
-    const { data: chs, error: chErr } = await supabase
-      .from("challenges")
-      .select("*")
-      .order("created_at", { ascending: false });
-    if (chErr) console.error("[TeamReach] challenges fetch failed:", chErr);
-    if (myToken !== refreshTokenRef.current) return;
-    if (!chs) {
-      setChallenges([]);
-      setChallengesReady(true);
-      return;
+    // Always release the skeleton, even if every query below fails. Otherwise
+    // a single network blip (common inside in-app WebViews) freezes the UI on
+    // the loading state forever.
+    try {
+      const { data: { session } } = await supabase.auth.getSession();
+      if (!session?.user || !isLatest()) return;
+      const me = session.user.id;
+
+      const { data: chs, error: chErr } = await supabase
+        .from("challenges")
+        .select("*")
+        .order("created_at", { ascending: false });
+      if (chErr) console.error("[TeamReach] challenges fetch failed:", chErr);
+      if (!isLatest()) return;
+      if (!chs) {
+        setChallenges([]);
+        return;
+      }
+
+      const ids = chs.map((c) => c.id);
+      const safeIds = ids.length ? ids : ["00000000-0000-0000-0000-000000000000"];
+
+      const [{ data: parts }, { data: progress }, { data: profiles }] = await Promise.all([
+        supabase.from("challenge_participants").select("challenge_id,user_id").in("challenge_id", safeIds),
+        supabase.from("progress_entries").select("challenge_id,user_id,amount,day,created_at").in("challenge_id", safeIds),
+        supabase.from("profiles").select("id,first_name,username,photo_url"),
+      ]);
+
+      const profilesById = new Map((profiles ?? []).map((p) => [p.id, p]));
+
+      const out: Challenge[] = chs.map((c) => {
+        const cParts = (parts ?? []).filter((p) => p.challenge_id === c.id);
+        const cProgress = (progress ?? []).filter((p) => p.challenge_id === c.id);
+
+        const totals = new Map<string, number>();
+        for (const p of cProgress) totals.set(p.user_id, (totals.get(p.user_id) ?? 0) + p.amount);
+
+        const myTotal = totals.get(me) ?? 0;
+        const totalAll = cProgress.reduce((s, p) => s + p.amount, 0);
+
+        const participants: Participant[] = cParts
+          .filter((p) => p.user_id !== me)
+          .map((p) => {
+            const prof = profilesById.get(p.user_id);
+            return {
+              name: prof?.first_name || prof?.username || "User",
+              avatar: prof?.photo_url ?? undefined,
+              value: totals.get(p.user_id) ?? 0,
+            };
+          });
+
+        const myEntries = cProgress.filter((p) => p.user_id === me);
+
+        return {
+          id: c.id,
+          title: c.title,
+          emoji: c.emoji,
+          unit: c.unit,
+          goal: c.goal,
+          current: Math.min(c.goal, myTotal),
+          totalAll,
+          daysLeft: daysLeftFromDeadline(c.deadline),
+          surface: (c.surface as Challenge["surface"]) ?? "blue",
+          joined: cParts.some((p) => p.user_id === me),
+          members: cParts.length,
+          history: buildHistory(myEntries),
+          participants,
+        };
+      });
+
+      if (!isLatest()) return;
+      setChallenges(out);
+    } catch (err) {
+      console.error("[TeamReach] refresh() failed:", err);
+    } finally {
+      // Always clear the skeleton for the latest refresh, even on error.
+      if (isLatest()) setChallengesReady(true);
     }
-
-    const ids = chs.map((c) => c.id);
-    const safeIds = ids.length ? ids : ["00000000-0000-0000-0000-000000000000"];
-
-    const [{ data: parts }, { data: progress }, { data: profiles }] = await Promise.all([
-      supabase.from("challenge_participants").select("challenge_id,user_id").in("challenge_id", safeIds),
-      supabase.from("progress_entries").select("challenge_id,user_id,amount,day,created_at").in("challenge_id", safeIds),
-      supabase.from("profiles").select("id,first_name,username,photo_url"),
-    ]);
-
-    const profilesById = new Map((profiles ?? []).map((p) => [p.id, p]));
-
-    const out: Challenge[] = chs.map((c) => {
-      const cParts = (parts ?? []).filter((p) => p.challenge_id === c.id);
-      const cProgress = (progress ?? []).filter((p) => p.challenge_id === c.id);
-
-      const totals = new Map<string, number>();
-      for (const p of cProgress) totals.set(p.user_id, (totals.get(p.user_id) ?? 0) + p.amount);
-
-      const myTotal = totals.get(me) ?? 0;
-      const totalAll = cProgress.reduce((s, p) => s + p.amount, 0);
-
-      const participants: Participant[] = cParts
-        .filter((p) => p.user_id !== me)
-        .map((p) => {
-          const prof = profilesById.get(p.user_id);
-          return {
-            name: prof?.first_name || prof?.username || "User",
-            avatar: prof?.photo_url ?? undefined,
-            value: totals.get(p.user_id) ?? 0,
-          };
-        });
-
-      const myEntries = cProgress.filter((p) => p.user_id === me);
-
-      return {
-        id: c.id,
-        title: c.title,
-        emoji: c.emoji,
-        unit: c.unit,
-        goal: c.goal,
-        current: Math.min(c.goal, myTotal),
-        totalAll,
-        daysLeft: daysLeftFromDeadline(c.deadline),
-        surface: (c.surface as Challenge["surface"]) ?? "blue",
-        joined: cParts.some((p) => p.user_id === me),
-        members: cParts.length,
-        history: buildHistory(myEntries),
-        participants,
-      };
-    });
-
-    if (myToken !== refreshTokenRef.current) return;
-    setChallenges(out);
-    setChallengesReady(true);
   }, []);
 
   // --- Email auth ---
@@ -244,9 +252,22 @@ export const AppProvider = ({ children }: { children: ReactNode }) => {
       lastAppliedUserId = nextUserId;
 
       if (session?.user) {
+        // Detect orphan Telegram-era sessions: those users have synthetic
+        // emails ending in @telegram.local and no profile row in the new
+        // email-only schema. Force them to sign in fresh.
+        const email = session.user.email ?? "";
+        if (email.endsWith("@telegram.local")) {
+          console.warn("[TeamReach] dropping stale Telegram-era session");
+          await supabase.auth.signOut();
+          return;
+        }
         setAuth({ status: "authenticated", userId: session.user.id });
         setChallengesReady(false);
-        await refreshAdmin(session.user.id);
+        try {
+          await refreshAdmin(session.user.id);
+        } catch (err) {
+          console.error("[TeamReach] refreshAdmin failed:", err);
+        }
         await refresh();
       } else {
         setAuth({ status: "unauthenticated" });
