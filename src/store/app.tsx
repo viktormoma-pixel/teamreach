@@ -20,10 +20,12 @@ type AuthState =
 
 type AppContextValue = {
   auth: AuthState;
-  signInWithEmail: (email: string, password: string) => Promise<void>;
-  signUpWithEmail: (email: string, password: string) => Promise<void>;
-  resendConfirmation: (email: string) => Promise<void>;
-  sendPasswordReset: (email: string) => Promise<void>;
+  // captchaToken is required when Supabase Auth has CAPTCHA enabled (prod).
+  // It is single-use; callers should reset their widget after every submit.
+  signInWithEmail: (email: string, password: string, captchaToken?: string) => Promise<void>;
+  signUpWithEmail: (email: string, password: string, captchaToken?: string) => Promise<void>;
+  resendConfirmation: (email: string, captchaToken?: string) => Promise<void>;
+  sendPasswordReset: (email: string, captchaToken?: string) => Promise<void>;
   updatePassword: (password: string) => Promise<void>;
   passwordRecovery: boolean;
   exitPasswordRecovery: () => void;
@@ -203,15 +205,21 @@ export const AppProvider = ({ children }: { children: ReactNode }) => {
 
   // --- Email auth ---
   // signInWithEmail: caller handles errors via try/catch for inline form feedback
-  const signInWithEmail = useCallback(async (email: string, password: string) => {
-    const { error } = await supabase.auth.signInWithPassword({ email, password });
+  const signInWithEmail = useCallback(async (email: string, password: string, captchaToken?: string) => {
+    const { error } = await supabase.auth.signInWithPassword({
+      email, password,
+      options: captchaToken ? { captchaToken } : undefined,
+    });
     if (error) throw error;
     // onAuthStateChange (SIGNED_IN) will update auth state, admin, and challenges
   }, []);
 
   // signUpWithEmail: throws EMAIL_CONFIRMATION_REQUIRED if Supabase requires email verify
-  const signUpWithEmail = useCallback(async (email: string, password: string) => {
-    const { data, error } = await supabase.auth.signUp({ email, password });
+  const signUpWithEmail = useCallback(async (email: string, password: string, captchaToken?: string) => {
+    const { data, error } = await supabase.auth.signUp({
+      email, password,
+      options: captchaToken ? { captchaToken } : undefined,
+    });
     if (error) throw error;
     if (!data.session) {
       // Email confirmation is enabled in Supabase → user must verify email first
@@ -221,15 +229,19 @@ export const AppProvider = ({ children }: { children: ReactNode }) => {
   }, []);
 
   // --- Resend confirmation email ---
-  const resendConfirmation = useCallback(async (email: string) => {
-    const { error } = await supabase.auth.resend({ type: "signup", email });
+  const resendConfirmation = useCallback(async (email: string, captchaToken?: string) => {
+    const { error } = await supabase.auth.resend({
+      type: "signup", email,
+      options: captchaToken ? { captchaToken } : undefined,
+    });
     if (error) throw error;
   }, []);
 
   // --- Password reset ---
-  const sendPasswordReset = useCallback(async (email: string) => {
+  const sendPasswordReset = useCallback(async (email: string, captchaToken?: string) => {
     const { error } = await supabase.auth.resetPasswordForEmail(email, {
       redirectTo: `${window.location.origin}/`,
+      captchaToken,
     });
     if (error) throw error;
   }, []);

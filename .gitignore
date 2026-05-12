@@ -33,3 +33,4 @@ dist-ssr
 
 # Supabase CLI local cache (contains linked project ref)
 supabase/.temp/
+.vercel
