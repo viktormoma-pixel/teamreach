@@ -10,7 +10,7 @@ export const Leaderboard = () => {
   const { t } = useI18n();
   const { tab } = useApp();
   const [rows, setRows] = useState<Row[]>([]);
-  const [loading, setLoading] = useState(false);
+  const [loading, setLoading] = useState(true);
 
   const loadRows = useCallback(async () => {
     setLoading(true);
@@ -68,7 +68,19 @@ export const Leaderboard = () => {
         </button>
       </header>
 
-      {sorted.length === 0 ? (
+      {sorted.length === 0 && loading ? (
+        <div className="mt-12 space-y-3 animate-pulse">
+          {[1, 2, 3].map((i) => (
+            <div key={i} className="rounded-3xl border border-border p-5 flex items-center gap-4">
+              <div className="h-10 w-10 rounded-full bg-muted" />
+              <div className="flex-1 space-y-2">
+                <div className="h-3 w-1/2 bg-muted rounded-full" />
+                <div className="h-3 w-1/3 bg-muted rounded-full" />
+              </div>
+            </div>
+          ))}
+        </div>
+      ) : sorted.length === 0 ? (
         <div className="mt-12 rounded-3xl border border-dashed border-border p-8 text-center text-sm text-muted-foreground">
           {t("dash.empty") || "No data yet"}
         </div>

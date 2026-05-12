@@ -9,7 +9,7 @@ import { CreateChallengeDialog } from "./CreateChallengeDialog";
 import { supabase } from "@/integrations/supabase/client";
 
 export const Dashboard = () => {
-  const { challenges, setSelectedId, joinChallenge, isAdmin, auth } = useApp();
+  const { challenges, challengesReady, setSelectedId, joinChallenge, isAdmin, auth } = useApp();
   const { t } = useI18n();
   const [createOpen, setCreateOpen] = useState(false);
   const [profile, setProfile] = useState<{ first_name?: string | null; username?: string | null; photo_url?: string | null; email?: string | null } | null>(null);
@@ -69,7 +69,13 @@ export const Dashboard = () => {
           <span className="text-sm text-muted-foreground">{t("dash.active", { n: mine.length })}</span>
         </div>
         <div className="space-y-3">
-          {mine.length === 0 && (
+          {!challengesReady && (
+            <div className="rounded-3xl border border-border p-6 space-y-2 animate-pulse">
+              <div className="h-4 w-2/3 bg-muted rounded-full" />
+              <div className="h-3 w-1/2 bg-muted rounded-full" />
+            </div>
+          )}
+          {challengesReady && mine.length === 0 && (
             <div className="rounded-3xl border border-dashed border-border p-6 text-center text-sm text-muted-foreground">
               {t("dash.empty")}
             </div>
@@ -85,7 +91,13 @@ export const Dashboard = () => {
           <h3 className="font-bold text-base">{t("dash.available")}</h3>
         </div>
         <div className="space-y-3">
-          {available.length === 0 && (
+          {!challengesReady && (
+            <div className="rounded-3xl border border-border p-6 space-y-2 animate-pulse">
+              <div className="h-4 w-2/3 bg-muted rounded-full" />
+              <div className="h-3 w-1/2 bg-muted rounded-full" />
+            </div>
+          )}
+          {challengesReady && available.length === 0 && (
             <div className="rounded-3xl border border-dashed border-border p-6 text-center text-sm text-muted-foreground">
               {t("dash.empty")}
             </div>

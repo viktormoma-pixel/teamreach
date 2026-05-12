@@ -26,6 +26,7 @@ type AppContextValue = {
   onboarded: boolean;
   setOnboarded: (v: boolean) => void;
   challenges: Challenge[];
+  challengesReady: boolean;
   refresh: () => Promise<void>;
   addProgress: (id: string, amount: number) => Promise<void>;
   joinChallenge: (id: string) => Promise<void>;
@@ -79,6 +80,7 @@ export const AppProvider = ({ children }: { children: ReactNode }) => {
   const [auth, setAuth] = useState<AuthState>({ status: "loading" });
   const [onboarded, setOnboardedState] = useState(false);
   const [challenges, setChallenges] = useState<Challenge[]>([]);
+  const [challengesReady, setChallengesReady] = useState(false);
   const [selectedId, setSelectedId] = useState<string | null>(null);
   const [tab, setTab] = useState<Tab>("home");
   const [isAdmin, setIsAdminState] = useState(false);
@@ -109,7 +111,7 @@ export const AppProvider = ({ children }: { children: ReactNode }) => {
       .select("*")
       .order("created_at", { ascending: false });
     if (chErr) console.error("[TeamReach] challenges fetch failed:", chErr);
-    if (!chs) { setChallenges([]); return; }
+    if (!chs) { setChallenges([]); setChallengesReady(true); return; }
 
     const ids = chs.map((c) => c.id);
     const safeIds = ids.length ? ids : ["00000000-0000-0000-0000-000000000000"];
@@ -163,6 +165,7 @@ export const AppProvider = ({ children }: { children: ReactNode }) => {
     });
 
     setChallenges(out);
+    setChallengesReady(true);
   }, []);
 
   // --- Email auth ---
@@ -198,6 +201,7 @@ export const AppProvider = ({ children }: { children: ReactNode }) => {
     const { data: { subscription } } = supabase.auth.onAuthStateChange(async (evt, session) => {
       if ((evt === "SIGNED_IN" || evt === "TOKEN_REFRESHED" || evt === "INITIAL_SESSION") && session?.user) {
         setAuth({ status: "authenticated", userId: session.user.id });
+        setChallengesReady(false);
         await refreshAdmin(session.user.id);
         await refresh();
       } else if (evt === "INITIAL_SESSION" && !session) {
@@ -206,6 +210,7 @@ export const AppProvider = ({ children }: { children: ReactNode }) => {
         setAuth({ status: "unauthenticated" });
         setIsAdminState(false);
         setChallenges([]);
+        setChallengesReady(false);
       }
     });
 
@@ -297,7 +302,7 @@ export const AppProvider = ({ children }: { children: ReactNode }) => {
       value={{
         auth, signInWithEmail, signUpWithEmail, signOut,
         onboarded, setOnboarded,
-        challenges, refresh,
+        challenges, challengesReady, refresh,
         addProgress, joinChallenge, createChallenge, deleteChallenge,
         selectedId, setSelectedId, tab, setTab,
         resetAll, isAdmin, setIsAdmin,
