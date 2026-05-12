@@ -46,8 +46,9 @@ export const Leaderboard = () => {
     }
   }, []);
 
-  useEffect(() => { loadRows(); }, [loadRows]);
-  useEffect(() => { if (tab === "leaderboard") loadRows(); }, [tab, loadRows]);
+  useEffect(() => {
+    if (tab === "leaderboard") loadRows();
+  }, [tab, loadRows]);
 
   const sorted = rows;
   const top = sorted.slice(0, 3);

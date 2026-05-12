@@ -17,15 +17,22 @@ export const Dashboard = () => {
   const available = challenges.filter((c) => !c.joined);
 
   useEffect(() => {
-    if (auth.status !== "authenticated") return;
+    if (auth.status !== "authenticated") {
+      setProfile(null);
+      return;
+    }
+    let cancelled = false;
+    const targetId = auth.userId;
     (async () => {
       const { data: userData } = await supabase.auth.getUser();
+      if (cancelled) return;
       const authEmail = userData?.user?.email ?? null;
       const { data } = await supabase
         .from("profiles")
         .select("first_name,username,photo_url,email")
-        .eq("id", auth.userId)
+        .eq("id", targetId)
         .maybeSingle();
+      if (cancelled) return;
       setProfile({
         first_name: data?.first_name ?? null,
         username: data?.username ?? null,
@@ -33,6 +40,7 @@ export const Dashboard = () => {
         email: data?.email ?? authEmail,
       });
     })();
+    return () => { cancelled = true; };
   }, [auth]);
 
   // Greeting falls back to the email local-part, then to a neutral label.
