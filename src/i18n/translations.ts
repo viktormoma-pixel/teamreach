@@ -172,6 +172,13 @@ export const translations: Record<Lang, Dict> = {
     "cc.errUnit": "Pick a unit",
     "cc.errGoal": "Goal must be > 0",
     "cc.errDeadline": "Pick a deadline",
+
+    // Cookie consent banner
+    "cookie.title": "We use analytics cookies",
+    "cookie.description": "We use Mixpanel to understand how people use TeamReach. This helps us improve the app. No personal data is sold or shared with third parties.",
+    "cookie.accept": "Accept",
+    "cookie.decline": "Decline",
+    "cookie.learnMore": "Privacy Policy",
   },
 
   ru: {
@@ -329,6 +336,13 @@ export const translations: Record<Lang, Dict> = {
     "cc.errUnit": "Выберите единицу",
     "cc.errGoal": "Цель должна быть > 0",
     "cc.errDeadline": "Выберите дедлайн",
+
+    // Cookie consent banner
+    "cookie.title": "Мы используем аналитические cookie",
+    "cookie.description": "Мы используем Mixpanel, чтобы понять, как люди используют TeamReach. Это помогает нам улучшать приложение. Персональные данные не продаются и не передаются третьим лицам.",
+    "cookie.accept": "Принять",
+    "cookie.decline": "Отклонить",
+    "cookie.learnMore": "Политика конфиденциальности",
   },
 
   de: {
@@ -486,5 +500,12 @@ export const translations: Record<Lang, Dict> = {
     "cc.errUnit": "Einheit auswählen",
     "cc.errGoal": "Ziel muss > 0 sein",
     "cc.errDeadline": "Deadline auswählen",
+
+    // Cookie consent banner
+    "cookie.title": "Wir verwenden Analyse-Cookies",
+    "cookie.description": "Wir nutzen Mixpanel, um zu verstehen, wie TeamReach verwendet wird. Das hilft uns, die App zu verbessern. Keine persönlichen Daten werden verkauft oder weitergegeben.",
+    "cookie.accept": "Akzeptieren",
+    "cookie.decline": "Ablehnen",
+    "cookie.learnMore": "Datenschutzerklärung",
   },
 };
