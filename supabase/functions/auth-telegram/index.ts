@@ -18,32 +18,25 @@ import { createClient } from "https://esm.sh/@supabase/supabase-js@2.45.0";
 
 // ---------------------------------------------------------------------------
 // CORS
+//
+// Telegram Mobile WebView sends requests without an Origin header (or with
+// null). Security here is provided entirely by the HMAC-SHA256 signature
+// check on initData — there is nothing to steal without the BOT_TOKEN, so
+// an open CORS policy is safe for this specific endpoint.
 // ---------------------------------------------------------------------------
 
-const ALLOWED = (Deno.env.get("ALLOWED_ORIGINS") ?? "")
-  .split(",")
-  .map((s) => s.trim())
-  .filter(Boolean);
-
-function corsHeaders(origin: string | null): Record<string, string> {
-  const allowed = origin && ALLOWED.includes(origin) ? origin : null;
-  const base: Record<string, string> = {
+function corsHeaders(): Record<string, string> {
+  return {
+    "Access-Control-Allow-Origin": "*",
     "Access-Control-Allow-Headers": "authorization, x-client-info, apikey, content-type",
     "Access-Control-Allow-Methods": "POST, OPTIONS",
-    "Vary": "Origin",
   };
-  if (allowed) base["Access-Control-Allow-Origin"] = allowed;
-  return base;
 }
 
-function isOriginAllowed(origin: string | null): boolean {
-  return !!(origin && ALLOWED.includes(origin));
-}
-
-function json(body: unknown, status: number, origin: string | null): Response {
+function json(body: unknown, status: number): Response {
   return new Response(JSON.stringify(body), {
     status,
-    headers: { ...corsHeaders(origin), "Content-Type": "application/json" },
+    headers: { ...corsHeaders(), "Content-Type": "application/json" },
   });
 }
 
@@ -192,19 +185,11 @@ async function findOrCreateTelegramUser(
 // ---------------------------------------------------------------------------
 
 Deno.serve(async (req) => {
-  const origin = req.headers.get("origin");
-
-  if (ALLOWED.length === 0) {
-    return json({ error: "server misconfigured: ALLOWED_ORIGINS not set" }, 500, origin);
-  }
-  if (!isOriginAllowed(origin)) {
-    return json({ error: "origin not allowed" }, 403, origin);
-  }
   if (req.method === "OPTIONS") {
-    return new Response(null, { status: 204, headers: corsHeaders(origin) });
+    return new Response(null, { status: 204, headers: corsHeaders() });
   }
   if (req.method !== "POST") {
-    return json({ error: "method not allowed" }, 405, origin);
+    return json({ error: "method not allowed" }, 405);
   }
 
   try {
@@ -212,7 +197,7 @@ Deno.serve(async (req) => {
     const SUPABASE_URL = Deno.env.get("SUPABASE_URL");
     const SERVICE_KEY = Deno.env.get("SUPABASE_SERVICE_ROLE_KEY");
     if (!BOT_TOKEN || !SUPABASE_URL || !SERVICE_KEY) {
-      return json({ error: "server misconfigured: env vars missing" }, 500, origin);
+      return json({ error: "server misconfigured: env vars missing" }, 500);
     }
 
     const MAX_AGE = parseInt(
@@ -226,10 +211,10 @@ Deno.serve(async (req) => {
     try {
       body = await req.json() as { initData?: unknown };
     } catch {
-      return json({ error: "invalid JSON body" }, 400, origin);
+      return json({ error: "invalid JSON body" }, 400);
     }
     if (typeof body.initData !== "string" || body.initData.length > 4096) {
-      return json({ error: "initData must be a non-empty string ≤ 4096 chars" }, 400, origin);
+      return json({ error: "initData must be a non-empty string ≤ 4096 chars" }, 400);
     }
 
     // Verify Telegram initData
@@ -240,7 +225,6 @@ Deno.serve(async (req) => {
       return json(
         { error: err instanceof Error ? err.message : "initData verification failed" },
         401,
-        origin,
       );
     }
 
@@ -263,7 +247,6 @@ Deno.serve(async (req) => {
       return json(
         { error: err instanceof Error ? err.message : "user setup failed" },
         500,
-        origin,
       );
     }
 
@@ -272,7 +255,7 @@ Deno.serve(async (req) => {
       user_id: userId,
     });
     if (sessionErr || !sessionData?.session) {
-      return json({ error: sessionErr?.message ?? "session creation failed" }, 500, origin);
+      return json({ error: sessionErr?.message ?? "session creation failed" }, 500);
     }
 
     return json(
@@ -284,9 +267,8 @@ Deno.serve(async (req) => {
         username: telegramUser.username ?? null,
       },
       200,
-      origin,
     );
   } catch (e) {
-    return json({ error: e instanceof Error ? e.message : "unknown error" }, 500, origin);
+    return json({ error: e instanceof Error ? e.message : "unknown error" }, 500);
   }
 });
