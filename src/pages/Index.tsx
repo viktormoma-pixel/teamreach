@@ -1,4 +1,4 @@
-import { useEffect, useState } from "react";
+import { useEffect, useRef, useState } from "react";
 import { AppProvider, useApp } from "@/store/app";
 import { I18nProvider, useI18n } from "@/i18n";
 import { Onboarding } from "@/components/Onboarding";
@@ -14,20 +14,23 @@ const Shell = () => {
   const { auth, onboarded, tab, selectedId, passwordRecovery, signInWithTelegram } = useApp();
   const { t } = useI18n();
   const [telegramLoading, setTelegramLoading] = useState(false);
+  // Prevents re-auto-login after the user explicitly signs out within the same session.
+  const didAutoLoginRef = useRef(false);
 
   // Clear the Telegram loading flag once auth resolves (success or sign-out).
-  // Without this, a successful signInWithTelegram() leaves the loader stuck
-  // forever because the only reset path is the .catch below.
   useEffect(() => {
     if (auth.status !== "unauthenticated") setTelegramLoading(false);
   }, [auth.status]);
 
-  // When unauthenticated inside a Telegram Mini App, attempt auto-login.
-  // If it fails (e.g. expired initData) we fall back to EmailAuthScreen.
+  // When unauthenticated inside a Telegram Mini App, attempt auto-login once.
+  // If the user signed out manually (didAutoLoginRef already set) we skip it
+  // so they land on the email/registration screen instead of being re-logged in.
   useEffect(() => {
     if (auth.status !== "unauthenticated") return;
     if (!window.Telegram?.WebApp?.initData) return;
+    if (didAutoLoginRef.current) return; // user signed out — don't re-login
 
+    didAutoLoginRef.current = true;
     window.Telegram.WebApp.ready();
     window.Telegram.WebApp.expand();
     setTelegramLoading(true);
