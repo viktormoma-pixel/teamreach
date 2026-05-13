@@ -2,7 +2,7 @@ import { Link } from "react-router-dom";
 import { ArrowLeft } from "lucide-react";
 import { useI18n } from "@/i18n";
 
-const LAST_UPDATED = "2026-05-12";
+const LAST_UPDATED = "2026-05-13";
 
 const Privacy = () => {
   const { lang } = useI18n();
@@ -89,18 +89,37 @@ const DE = () => (
           <strong>Vercel Inc.</strong> (USA) – Hosting der Web-App. Verbindungsdaten (IP, User-Agent, Zeitstempel)
           werden zur Auslieferung der Seiten kurzfristig verarbeitet.
         </li>
+        <li>
+          <strong>Mixpanel Inc.</strong> (USA) – Produktanalyse (Nutzungsereignisse). Datenverarbeitung erfolgt im
+          EU-Datencenter (<code>api-eu.mixpanel.com</code>). Aktiv erst nach Einwilligung über den Cookie-Banner
+          (Art. 6 Abs. 1 lit. a DSGVO). Übermittlung in Drittländer auf Basis der EU-Standardvertragsklauseln.
+        </li>
+        <li>
+          <strong>Microsoft Clarity</strong> (Microsoft Corporation, USA) – anonymisierte Sitzungsaufzeichnungen
+          und Heatmaps zur Verbesserung der Nutzerfreundlichkeit. Aktiv erst nach Einwilligung über den Cookie-Banner.
+          Übermittlung in Drittländer auf Basis der EU-Standardvertragsklauseln.
+        </li>
+        <li>
+          <strong>Plausible Analytics</strong> (Plausible Insights OÜ, Estland, EU) – datenschutzfreundliche
+          Web-Analyse ohne Cookies und ohne personenbezogene Daten. Hosting ausschließlich in der EU.
+        </li>
       </ul>
     </Block>
 
     <Block title="5. Cookies und Tracking">
       <p>
-        Wir verwenden ausschließlich technisch notwendige Cookies bzw. localStorage-Einträge zur Sitzungsverwaltung
-        und Speicherung der Spracheinstellung. <strong>Es findet derzeit kein Analyse- oder Marketing-Tracking statt.</strong>
+        Wir verwenden technisch notwendige Cookies bzw. localStorage-Einträge zur Sitzungsverwaltung und Speicherung
+        der Spracheinstellung. Zusätzlich setzen wir Analyse-Werkzeuge ein, die <strong>nur nach Ihrer ausdrücklichen
+        Einwilligung</strong> über den Cookie-Banner aktiviert werden (Art. 6 Abs. 1 lit. a DSGVO).
       </p>
+      <ul className="list-disc pl-5 space-y-1">
+        <li><strong>Mixpanel</strong> – Erfassung von Nutzungsereignissen (z. B. Registrierung, Erstellung von Challenges, Fortschrittseinträge), pseudonymisiert über eine zufällige ID.</li>
+        <li><strong>Microsoft Clarity</strong> – anonymisierte Sitzungsaufzeichnungen und Heatmaps zur Verbesserung der UX.</li>
+        <li><strong>Plausible Analytics</strong> – cookiefreie, aggregierte Seitenstatistiken (Seitenaufrufe, Verweildauer).</li>
+      </ul>
       <p>
-        Sollten künftig Analyse-Werkzeuge (z. B. Plausible, PostHog, Mixpanel, Amplitude oder Google Analytics)
-        eingeführt werden, wird diese Erklärung aktualisiert und Ihre Einwilligung über einen Cookie-Banner eingeholt
-        (Art. 6 Abs. 1 lit. a DSGVO).
+        Sie können Ihre Einwilligung jederzeit über den Cookie-Banner widerrufen. Bis zur Erteilung der Einwilligung
+        werden keine Analyse-Daten erhoben.
       </p>
     </Block>
 
@@ -186,17 +205,37 @@ const EN = () => (
         <li>
           <strong>Vercel Inc.</strong> (USA) – web app hosting. Connection data (IP, user agent, timestamp) is processed briefly to deliver pages.
         </li>
+        <li>
+          <strong>Mixpanel Inc.</strong> (USA) – product analytics (usage events). Data is processed in the EU data
+          center (<code>api-eu.mixpanel.com</code>). Active only after consent via the cookie banner (Art. 6 (1)(a) GDPR).
+          Third-country transfers based on the EU Standard Contractual Clauses.
+        </li>
+        <li>
+          <strong>Microsoft Clarity</strong> (Microsoft Corporation, USA) – anonymized session recordings and heatmaps
+          to improve usability. Active only after consent via the cookie banner. Third-country transfers based on the
+          EU Standard Contractual Clauses.
+        </li>
+        <li>
+          <strong>Plausible Analytics</strong> (Plausible Insights OÜ, Estonia, EU) – privacy-friendly web analytics
+          without cookies and without personal data. Hosted exclusively within the EU.
+        </li>
       </ul>
     </Block>
 
     <Block title="5. Cookies and tracking">
       <p>
         We use strictly necessary cookies / localStorage entries for session handling and storing your language choice.
-        <strong> No analytics or marketing tracking is currently in place.</strong>
+        In addition we use analytics tools that are activated <strong>only after your explicit consent</strong> via the
+        cookie banner (Art. 6 (1)(a) GDPR).
       </p>
+      <ul className="list-disc pl-5 space-y-1">
+        <li><strong>Mixpanel</strong> – usage events (e.g. sign-up, challenge creation, progress logs), pseudonymized via a random ID.</li>
+        <li><strong>Microsoft Clarity</strong> – anonymized session recordings and heatmaps for UX improvement.</li>
+        <li><strong>Plausible Analytics</strong> – cookieless, aggregated page statistics (page views, time on site).</li>
+      </ul>
       <p>
-        Should analytics tools (e.g. Plausible, PostHog, Mixpanel, Amplitude or Google Analytics) be introduced later,
-        this notice will be updated and your consent obtained via a cookie banner (Art. 6 (1)(a) GDPR).
+        You can withdraw your consent at any time via the cookie banner. No analytics data is collected before consent
+        is granted.
       </p>
     </Block>
 
@@ -284,17 +323,37 @@ const RU = () => (
           <strong>Vercel Inc.</strong> (США) — хостинг веб-приложения. Технические данные подключения (IP, user-agent,
           метка времени) обрабатываются кратковременно для доставки страниц.
         </li>
+        <li>
+          <strong>Mixpanel Inc.</strong> (США) — продуктовая аналитика (события использования). Данные обрабатываются
+          в дата-центре ЕС (<code>api-eu.mixpanel.com</code>). Активируется только после согласия через cookie-баннер
+          (ст. 6 (1)(a) GDPR). Передача в третьи страны на основании стандартных договорных положений ЕС.
+        </li>
+        <li>
+          <strong>Microsoft Clarity</strong> (Microsoft Corporation, США) — анонимизированные записи сессий и
+          тепловые карты для улучшения UX. Активируется только после согласия через cookie-баннер. Передача в третьи
+          страны на основании стандартных договорных положений ЕС.
+        </li>
+        <li>
+          <strong>Plausible Analytics</strong> (Plausible Insights OÜ, Эстония, ЕС) — аналитика, дружественная к
+          конфиденциальности, без cookies и без персональных данных. Хостинг исключительно в ЕС.
+        </li>
       </ul>
     </Block>
 
     <Block title="5. Cookies и трекинг">
       <p>
-        Мы используем только технически необходимые cookies / записи в localStorage для управления сессией и сохранения
-        выбора языка. <strong>Аналитический и маркетинговый трекинг в настоящее время не используется.</strong>
+        Мы используем технически необходимые cookies / записи в localStorage для управления сессией и сохранения
+        выбора языка. Дополнительно мы используем инструменты аналитики, которые активируются <strong>только после
+        вашего явного согласия</strong> через cookie-баннер (ст. 6 (1)(a) GDPR).
       </p>
+      <ul className="list-disc pl-5 space-y-1">
+        <li><strong>Mixpanel</strong> — события использования (регистрация, создание челленджей, записи прогресса), псевдонимизированные через случайный ID.</li>
+        <li><strong>Microsoft Clarity</strong> — анонимизированные записи сессий и тепловые карты для улучшения UX.</li>
+        <li><strong>Plausible Analytics</strong> — агрегированная статистика страниц без cookies (просмотры, время на сайте).</li>
+      </ul>
       <p>
-        В случае подключения сервисов аналитики (например, Plausible, PostHog, Mixpanel, Amplitude или Google Analytics)
-        эта политика будет обновлена, а согласие будет запрошено через cookie-баннер (ст. 6 (1)(a) GDPR).
+        Вы можете отозвать согласие в любой момент через cookie-баннер. До получения согласия аналитические данные
+        не собираются.
       </p>
     </Block>
 
