@@ -31,6 +31,7 @@ type AppContextValue = {
   passwordRecovery: boolean;
   exitPasswordRecovery: () => void;
   signOut: () => Promise<void>;
+  signInWithTelegram: () => Promise<void>;
   onboarded: boolean;
   setOnboarded: (v: boolean) => void;
   challenges: Challenge[];
@@ -241,6 +242,40 @@ export const AppProvider = ({ children }: { children: ReactNode }) => {
       options: captchaToken ? { captchaToken } : undefined,
     });
     if (error) throw error;
+  }, []);
+
+  // --- Telegram Mini App auth ---
+  const signInWithTelegram = useCallback(async () => {
+    const initData = window.Telegram?.WebApp?.initData;
+    if (!initData) throw new Error("Not running inside a Telegram Mini App");
+
+    const SUPABASE_URL = import.meta.env.VITE_SUPABASE_URL as string;
+    const SUPABASE_ANON = import.meta.env.VITE_SUPABASE_PUBLISHABLE_KEY as string;
+
+    const res = await fetch(`${SUPABASE_URL}/functions/v1/auth-telegram`, {
+      method: "POST",
+      headers: {
+        "Content-Type": "application/json",
+        "apikey": SUPABASE_ANON,
+      },
+      body: JSON.stringify({ initData }),
+    });
+
+    if (!res.ok) {
+      const err = await res.json().catch(() => ({ error: "Unknown error" }));
+      throw new Error((err as { error?: string }).error ?? "Telegram auth failed");
+    }
+
+    const { access_token, refresh_token } = await res.json() as {
+      access_token: string;
+      refresh_token: string;
+    };
+
+    const { error } = await supabase.auth.setSession({ access_token, refresh_token });
+    if (error) throw error;
+
+    mixpanel.track("signed_in", { method: "telegram" });
+    // onAuthStateChange (SIGNED_IN) will update auth state and load challenges
   }, []);
 
   // --- Password reset ---
@@ -456,7 +491,7 @@ export const AppProvider = ({ children }: { children: ReactNode }) => {
     <AppContext.Provider
       value={{
         auth, signInWithEmail, signUpWithEmail, resendConfirmation, sendPasswordReset, updatePassword,
-        passwordRecovery, exitPasswordRecovery, signOut,
+        passwordRecovery, exitPasswordRecovery, signOut, signInWithTelegram,
         onboarded, setOnboarded,
         challenges, challengesReady, refresh,
         addProgress, joinChallenge, createChallenge, deleteChallenge,

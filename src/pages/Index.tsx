@@ -1,3 +1,4 @@
+import { useEffect, useState } from "react";
 import { AppProvider, useApp } from "@/store/app";
 import { I18nProvider, useI18n } from "@/i18n";
 import { Onboarding } from "@/components/Onboarding";
@@ -10,11 +11,30 @@ import { EmailAuthScreen } from "@/components/EmailAuthScreen";
 import { UpdatePasswordScreen } from "@/components/UpdatePasswordScreen";
 
 const Shell = () => {
-  const { auth, onboarded, tab, selectedId, passwordRecovery } = useApp();
+  const { auth, onboarded, tab, selectedId, passwordRecovery, signInWithTelegram } = useApp();
   const { t } = useI18n();
+  const [telegramLoading, setTelegramLoading] = useState(false);
 
-  // Loading state
-  if (auth.status === "loading") {
+  // When unauthenticated inside a Telegram Mini App, attempt auto-login.
+  // If it fails (e.g. expired initData) we fall back to EmailAuthScreen.
+  useEffect(() => {
+    if (auth.status !== "unauthenticated") return;
+    if (!window.Telegram?.WebApp?.initData) return;
+
+    window.Telegram.WebApp.ready();
+    window.Telegram.WebApp.expand();
+    setTelegramLoading(true);
+
+    signInWithTelegram().catch((err) => {
+      console.warn("[TeamReach] Telegram auto-login failed:", err?.message ?? err);
+      setTelegramLoading(false);
+    });
+  // signInWithTelegram is stable (useCallback), auth.status is the real trigger
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [auth.status]);
+
+  // Loading state (initial session check or Telegram auto-login in progress)
+  if (auth.status === "loading" || telegramLoading) {
     return (
       <div className="app-shell grid place-items-center min-h-screen">
         <div className="text-center space-y-3">
@@ -25,7 +45,7 @@ const Shell = () => {
     );
   }
 
-  // Unauthenticated → always show email auth
+  // Unauthenticated → show email auth (also serves as fallback if Telegram auto-login failed)
   if (auth.status === "unauthenticated") {
     return <EmailAuthScreen />;
   }
