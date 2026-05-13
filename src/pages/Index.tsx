@@ -15,6 +15,13 @@ const Shell = () => {
   const { t } = useI18n();
   const [telegramLoading, setTelegramLoading] = useState(false);
 
+  // Clear the Telegram loading flag once auth resolves (success or sign-out).
+  // Without this, a successful signInWithTelegram() leaves the loader stuck
+  // forever because the only reset path is the .catch below.
+  useEffect(() => {
+    if (auth.status !== "unauthenticated") setTelegramLoading(false);
+  }, [auth.status]);
+
   // When unauthenticated inside a Telegram Mini App, attempt auto-login.
   // If it fails (e.g. expired initData) we fall back to EmailAuthScreen.
   useEffect(() => {
