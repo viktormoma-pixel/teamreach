@@ -233,16 +233,9 @@ Deno.serve(async (req) => {
       auth: { persistSession: false, autoRefreshToken: false },
     });
 
-    // Find or create user
-    let userId: string;
+    // Find or create user (ensures the Supabase account exists before issuing the link)
     try {
-      userId = await findOrCreateTelegramUser(
-        admin,
-        SUPABASE_URL,
-        SERVICE_KEY,
-        telegramUser,
-        EMAIL_DOMAIN,
-      );
+      await findOrCreateTelegramUser(admin, SUPABASE_URL, SERVICE_KEY, telegramUser, EMAIL_DOMAIN);
     } catch (err) {
       return json(
         { error: err instanceof Error ? err.message : "user setup failed" },
@@ -250,18 +243,37 @@ Deno.serve(async (req) => {
       );
     }
 
-    // Issue a fresh session for the user
-    const { data: sessionData, error: sessionErr } = await admin.auth.admin.createSession({
-      user_id: userId,
+    // Issue a fresh session via magic link — admin.createSession doesn't exist in
+    // supabase-js; instead we generate a sign-in link and follow its redirect to
+    // extract the access_token / refresh_token from the Location fragment.
+    const fakeEmail = `${telegramUser.id}@${EMAIL_DOMAIN}`;
+    const { data: linkData, error: linkErr } = await admin.auth.admin.generateLink({
+      type: "magiclink",
+      email: fakeEmail,
+      options: { redirectTo: SUPABASE_URL },
     });
-    if (sessionErr || !sessionData?.session) {
-      return json({ error: sessionErr?.message ?? "session creation failed" }, 500);
+    if (linkErr || !linkData?.properties?.action_link) {
+      return json({ error: linkErr?.message ?? "generateLink failed" }, 500);
+    }
+
+    // Follow the verify redirect (manual) to capture tokens from the Location fragment
+    const verifyRes = await fetch(linkData.properties.action_link, { redirect: "manual" });
+    const location = verifyRes.headers.get("location") ?? "";
+    const hashIdx = location.indexOf("#");
+    const fragment = hashIdx >= 0 ? location.slice(hashIdx + 1) : "";
+    const fragParams = new URLSearchParams(fragment);
+    const access_token = fragParams.get("access_token");
+    const refresh_token = fragParams.get("refresh_token");
+
+    if (!access_token || !refresh_token) {
+      const errDesc = fragParams.get("error_description") ?? fragParams.get("error") ?? "no tokens in redirect";
+      return json({ error: `session extraction failed: ${errDesc}` }, 500);
     }
 
     return json(
       {
-        access_token: sessionData.session.access_token,
-        refresh_token: sessionData.session.refresh_token,
+        access_token,
+        refresh_token,
         telegram_id: String(telegramUser.id),
         first_name: telegramUser.first_name,
         username: telegramUser.username ?? null,

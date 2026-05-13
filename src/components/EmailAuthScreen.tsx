@@ -484,11 +484,6 @@ export const EmailAuthScreen = () => {
           </div>
         )}
 
-        {/* Diagnostic strip — remove once Telegram auto-login is confirmed working */}
-        <div className="rounded-2xl border border-yellow-400 bg-yellow-50 px-3 py-2 text-[10px] font-mono break-all leading-tight">
-          <p>TG: {window.Telegram ? "✓" : "✗"} | WebApp: {window.Telegram?.WebApp ? "✓" : "✗"} | initData: {window.Telegram?.WebApp?.initData ? `✓ (${window.Telegram.WebApp.initData.length} ch)` : "✗"}</p>
-          <p>URL: {window.location.host}</p>
-        </div>
       </div>
     </div>
   );
