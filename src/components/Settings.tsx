@@ -82,8 +82,11 @@ export const Settings = () => {
     }
   };
 
-  // Subline under the username card: shows email or "—".
-  const profileSubline = profile?.email ?? "—";
+  // Subline: for Telegram accounts (synthetic email) show @username or full name; for real accounts show email.
+  const isTelegramAccount = profile?.email?.includes("@tg.") ?? false;
+  const profileSubline = isTelegramAccount
+    ? (profile?.username ? `@${profile.username}` : profile?.first_name ?? "—")
+    : (profile?.email ?? "—");
 
   return (
     <div className="px-5 pt-12 pb-32">
