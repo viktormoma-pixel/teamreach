@@ -5,7 +5,7 @@ import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Checkbox } from "@/components/ui/checkbox";
-import { Loader2, Mail, Lock, Eye, EyeOff, ShieldCheck } from "lucide-react";
+import { Loader2, Mail, Lock, Eye, EyeOff, ShieldCheck, Send } from "lucide-react";
 import { toast } from "sonner";
 import HCaptcha from "@hcaptcha/react-hcaptcha";
 
@@ -14,8 +14,26 @@ const HCAPTCHA_SITEKEY = import.meta.env.VITE_HCAPTCHA_SITEKEY as string | undef
 type Mode = "signin" | "signup" | "forgot";
 
 export const EmailAuthScreen = () => {
-  const { signInWithEmail, signUpWithEmail, resendConfirmation, sendPasswordReset } = useApp();
+  const { signInWithEmail, signUpWithEmail, resendConfirmation, sendPasswordReset, signInWithTelegram } = useApp();
   const { t } = useI18n();
+
+  const tgAvailable = typeof window !== "undefined" && !!window.Telegram?.WebApp?.initData;
+  const [tgLoading, setTgLoading] = useState(false);
+  const [tgError, setTgError] = useState<string | null>(null);
+
+  const handleTelegramSignIn = async () => {
+    setTgError(null);
+    setTgLoading(true);
+    try {
+      await signInWithTelegram();
+    } catch (err) {
+      const msg = err instanceof Error ? err.message : String(err);
+      setTgError(msg);
+      toast.error(`Telegram: ${msg}`);
+    } finally {
+      setTgLoading(false);
+    }
+  };
 
   const [mode, setMode] = useState<Mode>("signin");
   const [email, setEmail] = useState("");
@@ -423,6 +441,39 @@ export const EmailAuthScreen = () => {
           )}
         </form>
 
+        {/* Telegram sign-in: visible only inside a Telegram Mini App */}
+        {tgAvailable && mode !== "forgot" && (
+          <>
+            <div className="relative">
+              <div className="absolute inset-0 flex items-center">
+                <div className="w-full border-t border-border" />
+              </div>
+              <div className="relative flex justify-center text-xs uppercase">
+                <span className="bg-background px-2 text-muted-foreground">или</span>
+              </div>
+            </div>
+            <Button
+              type="button"
+              size="lg"
+              variant="outline"
+              onClick={handleTelegramSignIn}
+              disabled={tgLoading}
+              className="w-full h-12 rounded-2xl font-semibold"
+            >
+              {tgLoading ? (
+                <><Loader2 className="mr-2 h-4 w-4 animate-spin" />Подключение к Telegram…</>
+              ) : (
+                <><Send className="mr-2 h-4 w-4" />Войти через Telegram</>
+              )}
+            </Button>
+            {tgError && (
+              <div className="rounded-2xl bg-destructive/10 border border-destructive/20 px-4 py-3">
+                <p className="text-xs text-destructive font-medium break-all">{tgError}</p>
+              </div>
+            )}
+          </>
+        )}
+
         {/* Admin hint */}
         {mode !== "forgot" && (
           <div className="rounded-2xl bg-secondary px-4 py-3 flex gap-3 items-start">
@@ -432,6 +483,12 @@ export const EmailAuthScreen = () => {
             </p>
           </div>
         )}
+
+        {/* Diagnostic strip — remove once Telegram auto-login is confirmed working */}
+        <div className="rounded-2xl border border-yellow-400 bg-yellow-50 px-3 py-2 text-[10px] font-mono break-all leading-tight">
+          <p>TG: {window.Telegram ? "✓" : "✗"} | WebApp: {window.Telegram?.WebApp ? "✓" : "✗"} | initData: {window.Telegram?.WebApp?.initData ? `✓ (${window.Telegram.WebApp.initData.length} ch)` : "✗"}</p>
+          <p>URL: {window.location.host}</p>
+        </div>
       </div>
     </div>
   );
