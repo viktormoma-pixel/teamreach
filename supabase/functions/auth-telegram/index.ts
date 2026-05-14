@@ -234,13 +234,40 @@ Deno.serve(async (req) => {
     });
 
     // Find or create user (ensures the Supabase account exists before issuing the link)
+    let userId: string;
     try {
-      await findOrCreateTelegramUser(admin, SUPABASE_URL, SERVICE_KEY, telegramUser, EMAIL_DOMAIN);
+      userId = await findOrCreateTelegramUser(admin, SUPABASE_URL, SERVICE_KEY, telegramUser, EMAIL_DOMAIN);
     } catch (err) {
       return json(
         { error: err instanceof Error ? err.message : "user setup failed" },
         500,
       );
+    }
+
+    // Upsert profile fields from Telegram on every login so name/username/photo
+    // stay in sync (and backfill rows created before these fields were captured).
+    // Do NOT overwrite first_name if user has customized it: we only set it when
+    // it's currently null/empty.
+    try {
+      const { data: existing } = await admin
+        .from("profiles")
+        .select("first_name")
+        .eq("id", userId)
+        .maybeSingle();
+
+      const patch: Record<string, unknown> = {
+        id: userId,
+        telegram_id: telegramUser.id,
+        username: telegramUser.username ?? null,
+        last_name: telegramUser.last_name ?? null,
+        language_code: telegramUser.language_code ?? null,
+      };
+      if (!existing?.first_name) {
+        patch.first_name = telegramUser.first_name;
+      }
+      await admin.from("profiles").upsert(patch, { onConflict: "id" });
+    } catch (err) {
+      console.error("[auth-telegram] profile upsert failed:", err);
     }
 
     // Issue a fresh session via magic link — admin.createSession doesn't exist in

@@ -44,8 +44,14 @@ export const Dashboard = () => {
   }, [auth]);
 
   // Greeting falls back to the email local-part, then to a neutral label.
-  const emailLocal = profile?.email ? profile.email.split("@")[0] : null;
-  const displayName = profile?.first_name || profile?.username || emailLocal || "TeamReach";
+  // Skip the email local-part for synthetic Telegram emails (e.g. 851922@tg.local) —
+  // those would surface a meaningless numeric ID instead of a real name.
+  const isTelegramEmail = profile?.email
+    ? /@(?:tg\.|telegram\.)/i.test(profile.email)
+    : false;
+  const emailLocal = profile?.email && !isTelegramEmail ? profile.email.split("@")[0] : null;
+  const tgHandle = profile?.username ? `@${profile.username}` : null;
+  const displayName = profile?.first_name || tgHandle || emailLocal || "TeamReach";
   const initial = (profile?.first_name || profile?.username || emailLocal || "T").slice(0, 1).toUpperCase();
 
   return (
