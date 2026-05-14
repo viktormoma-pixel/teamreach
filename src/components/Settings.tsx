@@ -7,11 +7,16 @@ import {
   AlertDialog, AlertDialogAction, AlertDialogCancel, AlertDialogContent,
   AlertDialogDescription, AlertDialogFooter, AlertDialogHeader, AlertDialogTitle, AlertDialogTrigger,
 } from "@/components/ui/alert-dialog";
-import { ChevronRight, Shield, FileText, Mail, Trash2, ShieldCheck, Languages, Loader2, LogOut } from "lucide-react";
+import { ChevronRight, Shield, FileText, Mail, Trash2, ShieldCheck, Languages, Loader2, LogOut, Pencil } from "lucide-react";
 import { useEffect, useState } from "react";
 import { toast } from "sonner";
 import { supabase } from "@/integrations/supabase/client";
 import { useNavigate } from "react-router-dom";
+import {
+  Dialog, DialogContent, DialogDescription, DialogFooter, DialogHeader, DialogTitle,
+} from "@/components/ui/dialog";
+import { Input } from "@/components/ui/input";
+import { Button } from "@/components/ui/button";
 
 const Row = ({ icon: Icon, label, hint, right, onClick }: any) => (
   <button
@@ -40,6 +45,9 @@ export const Settings = () => {
     email?: string | null;
   } | null>(null);
   const [deleting, setDeleting] = useState(false);
+  const [editOpen, setEditOpen] = useState(false);
+  const [nicknameInput, setNicknameInput] = useState("");
+  const [savingName, setSavingName] = useState(false);
 
   const userId = auth.status === "authenticated" ? auth.userId : null;
 
@@ -82,6 +90,39 @@ export const Settings = () => {
     }
   };
 
+  const openEdit = () => {
+    setNicknameInput(profile?.first_name ?? "");
+    setEditOpen(true);
+  };
+
+  const handleSaveName = async () => {
+    if (!userId) return;
+    const trimmed = nicknameInput.trim();
+    if (!trimmed) {
+      toast.error(t("set.nameRequired"));
+      return;
+    }
+    if (trimmed.length > 50) {
+      toast.error(t("set.nameTooLong"));
+      return;
+    }
+    setSavingName(true);
+    try {
+      const { error } = await supabase
+        .from("profiles")
+        .update({ first_name: trimmed })
+        .eq("id", userId);
+      if (error) throw error;
+      setProfile((p) => (p ? { ...p, first_name: trimmed } : p));
+      setEditOpen(false);
+      toast.success(t("set.nameSaved"));
+    } catch (e) {
+      toast.error(e instanceof Error ? e.message : "Failed");
+    } finally {
+      setSavingName(false);
+    }
+  };
+
   // Subline: for Telegram accounts (synthetic email) show @username or full name; for real accounts show email.
   const isTelegramAccount = profile?.email?.includes("@tg.") ?? false;
   const profileSubline = isTelegramAccount
@@ -107,7 +148,39 @@ export const Settings = () => {
           <p className="font-bold truncate">{profile?.first_name || profile?.username || profile?.email || "User"}</p>
           <p className="text-sm opacity-80 truncate">{profileSubline}</p>
         </div>
+        <button
+          onClick={openEdit}
+          aria-label={t("set.editName")}
+          className="h-9 w-9 rounded-full bg-background/20 hover:bg-background/30 grid place-items-center transition shrink-0"
+        >
+          <Pencil className="h-4 w-4" />
+        </button>
       </div>
+
+      <Dialog open={editOpen} onOpenChange={setEditOpen}>
+        <DialogContent>
+          <DialogHeader>
+            <DialogTitle>{t("set.editName")}</DialogTitle>
+            <DialogDescription>{t("set.editNameDesc")}</DialogDescription>
+          </DialogHeader>
+          <Input
+            value={nicknameInput}
+            onChange={(e) => setNicknameInput(e.target.value)}
+            placeholder={t("set.namePlaceholder")}
+            maxLength={50}
+            autoFocus
+          />
+          <DialogFooter>
+            <Button variant="ghost" onClick={() => setEditOpen(false)} disabled={savingName}>
+              {t("common.cancel")}
+            </Button>
+            <Button onClick={handleSaveName} disabled={savingName}>
+              {savingName ? <Loader2 className="h-4 w-4 animate-spin mr-2" /> : null}
+              {t("common.save")}
+            </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
 
       <h2 className="mt-8 mb-2 text-xs font-bold uppercase tracking-wider text-muted-foreground px-2">{t("set.preferences")}</h2>
       <div className="rounded-3xl bg-card border border-border divide-y divide-border overflow-hidden shadow-soft">

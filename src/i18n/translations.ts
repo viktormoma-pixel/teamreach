@@ -13,6 +13,7 @@ export const translations: Record<Lang, Dict> = {
     "auth.loading": "Connecting…",
     // Common
     "common.cancel": "Cancel",
+    "common.save": "Save",
     "common.create": "Create",
     "common.add": "Add",
     "common.next": "Next",
@@ -127,6 +128,12 @@ export const translations: Record<Lang, Dict> = {
     // Settings
     "set.title": "Settings",
     "set.subtitle": "Manage your profile and privacy.",
+    "set.editName": "Edit nickname",
+    "set.editNameDesc": "Choose how your name appears across the app.",
+    "set.namePlaceholder": "Your nickname",
+    "set.nameRequired": "Nickname can't be empty",
+    "set.nameTooLong": "Nickname must be 50 characters or less",
+    "set.nameSaved": "Nickname updated",
     "set.preferences": "Preferences",
     "set.adminMode": "Admin mode",
     "set.adminModeHint": "Allows creating challenges",
@@ -184,6 +191,7 @@ export const translations: Record<Lang, Dict> = {
   ru: {
     "auth.loading": "Соединение…",
     "common.cancel": "Отмена",
+    "common.save": "Сохранить",
     "common.create": "Создать",
     "common.add": "Добавить",
     "common.next": "Далее",
@@ -292,6 +300,12 @@ export const translations: Record<Lang, Dict> = {
     "lb.progressOf": "{score} / {goal} {unit}",
 
     "set.title": "Настройки",
+    "set.editName": "Изменить имя",
+    "set.editNameDesc": "Выберите, как ваше имя будет отображаться в приложении.",
+    "set.namePlaceholder": "Ваш ник",
+    "set.nameRequired": "Имя не может быть пустым",
+    "set.nameTooLong": "Имя должно быть не длиннее 50 символов",
+    "set.nameSaved": "Имя обновлено",
     "set.subtitle": "Управление профилем и приватностью.",
     "set.preferences": "Предпочтения",
     "set.adminMode": "Режим администратора",
@@ -348,6 +362,7 @@ export const translations: Record<Lang, Dict> = {
   de: {
     "auth.loading": "Verbinden…",
     "common.cancel": "Abbrechen",
+    "common.save": "Speichern",
     "common.create": "Erstellen",
     "common.add": "Hinzufügen",
     "common.next": "Weiter",
@@ -456,6 +471,12 @@ export const translations: Record<Lang, Dict> = {
     "lb.progressOf": "{score} / {goal} {unit}",
 
     "set.title": "Einstellungen",
+    "set.editName": "Namen ändern",
+    "set.editNameDesc": "Lege fest, wie dein Name in der App angezeigt wird.",
+    "set.namePlaceholder": "Dein Spitzname",
+    "set.nameRequired": "Name darf nicht leer sein",
+    "set.nameTooLong": "Name darf höchstens 50 Zeichen haben",
+    "set.nameSaved": "Name aktualisiert",
     "set.subtitle": "Profil und Privatsphäre verwalten.",
     "set.preferences": "Einstellungen",
     "set.adminMode": "Admin-Modus",
