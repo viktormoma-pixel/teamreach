@@ -33,13 +33,8 @@ async function signInWithEmail(
   supabaseAuth: SupabaseAuthMock,
   email: string,
   password: string,
-  captchaToken?: string,
 ) {
-  const { error } = await supabaseAuth.signInWithPassword({
-    email,
-    password,
-    options: captchaToken ? { captchaToken } : undefined,
-  });
+  const { error } = await supabaseAuth.signInWithPassword({ email, password });
   if (error) throw error;
 }
 
@@ -50,17 +45,6 @@ describe("signInWithEmail", () => {
     expect(supa.signInWithPassword).toHaveBeenCalledWith({
       email: "a@b.c",
       password: "secret-12345",
-      options: undefined,
-    });
-  });
-
-  it("forwards captchaToken when provided", async () => {
-    const supa = makeSupabaseMock();
-    await signInWithEmail(supa, "a@b.c", "secret-12345", "cap-token");
-    expect(supa.signInWithPassword).toHaveBeenCalledWith({
-      email: "a@b.c",
-      password: "secret-12345",
-      options: { captchaToken: "cap-token" },
     });
   });
 

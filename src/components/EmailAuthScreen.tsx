@@ -1,4 +1,4 @@
-import { useState, useEffect, useRef } from "react";
+import { useState, useEffect } from "react";
 import { useApp } from "@/store/app";
 import { useI18n } from "@/i18n";
 import { Button } from "@/components/ui/button";
@@ -7,9 +7,6 @@ import { Label } from "@/components/ui/label";
 import { Checkbox } from "@/components/ui/checkbox";
 import { Loader2, Mail, Lock, Eye, EyeOff, ShieldCheck, Send } from "lucide-react";
 import { toast } from "sonner";
-import HCaptcha from "@hcaptcha/react-hcaptcha";
-
-const HCAPTCHA_SITEKEY = import.meta.env.VITE_HCAPTCHA_SITEKEY as string | undefined;
 
 type Mode = "signin" | "signup" | "forgot";
 
@@ -47,15 +44,6 @@ export const EmailAuthScreen = () => {
   const [resetSentTo, setResetSentTo] = useState<string | null>(null);
   const [acceptTerms, setAcceptTerms] = useState(false);
   const [acceptPrivacy, setAcceptPrivacy] = useState(false);
-  const [captchaToken, setCaptchaToken] = useState<string | null>(null);
-  const captchaRef = useRef<HCaptcha | null>(null);
-
-  // Captcha tokens are single-use. After every submit we reset the widget so
-  // the user gets a fresh challenge for the next attempt.
-  const resetCaptcha = () => {
-    setCaptchaToken(null);
-    captchaRef.current?.resetCaptcha();
-  };
 
   const resetForm = () => {
     setEmail("");
@@ -65,7 +53,6 @@ export const EmailAuthScreen = () => {
     setShowPassword(false);
     setAcceptTerms(false);
     setAcceptPrivacy(false);
-    resetCaptcha();
   };
 
   const switchMode = (m: Mode) => {
@@ -82,24 +69,15 @@ export const EmailAuthScreen = () => {
       return;
     }
 
-    // hCaptcha is required by Supabase when CAPTCHA is enabled. If the sitekey
-    // isn't configured we silently skip (dev/local builds without env var).
-    if (HCAPTCHA_SITEKEY && !captchaToken) {
-      setError(t("email.errCaptcha"));
-      return;
-    }
-    const token = captchaToken ?? undefined;
-
     if (mode === "forgot") {
       setLoading(true);
       try {
-        await sendPasswordReset(email.trim(), token);
+        await sendPasswordReset(email.trim());
         setResetSentTo(email.trim());
       } catch (err) {
         setError(err instanceof Error ? err.message : "Unknown error");
       } finally {
         setLoading(false);
-        resetCaptcha();
       }
       return;
     }
@@ -120,9 +98,9 @@ export const EmailAuthScreen = () => {
     setLoading(true);
     try {
       if (mode === "signin") {
-        await signInWithEmail(email.trim(), password, token);
+        await signInWithEmail(email.trim(), password);
       } else {
-        await signUpWithEmail(email.trim(), password, token);
+        await signUpWithEmail(email.trim(), password);
       }
     } catch (err) {
       if (err instanceof Error && err.message === "EMAIL_CONFIRMATION_REQUIRED") {
@@ -142,7 +120,6 @@ export const EmailAuthScreen = () => {
       }
     } finally {
       setLoading(false);
-      resetCaptcha();
     }
   };
 
@@ -155,20 +132,15 @@ export const EmailAuthScreen = () => {
 
   const handleResend = async () => {
     if (resendCooldown > 0 || loading) return;
-    if (HCAPTCHA_SITEKEY && !captchaToken) {
-      toast.error(t("email.errCaptcha"));
-      return;
-    }
     setLoading(true);
     try {
-      await resendConfirmation(email.trim(), captchaToken ?? undefined);
+      await resendConfirmation(email.trim());
       toast.success(t("email.confirmResent"));
       setResendCooldown(30);
     } catch (err) {
       toast.error(err instanceof Error ? err.message : "Failed");
     } finally {
       setLoading(false);
-      resetCaptcha();
     }
   };
 
@@ -387,19 +359,6 @@ export const EmailAuthScreen = () => {
                   {t("email.consent.privacy")}
                 </span>
               </label>
-            </div>
-          )}
-
-          {/* hCaptcha — required when sitekey env is set */}
-          {HCAPTCHA_SITEKEY && (
-            <div className="flex justify-center">
-              <HCaptcha
-                ref={captchaRef}
-                sitekey={HCAPTCHA_SITEKEY}
-                onVerify={(token) => setCaptchaToken(token)}
-                onExpire={() => setCaptchaToken(null)}
-                onError={() => setCaptchaToken(null)}
-              />
             </div>
           )}
 
