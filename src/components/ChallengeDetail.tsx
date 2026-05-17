@@ -34,7 +34,9 @@ export const ChallengeDetail = () => {
       const saved = localStorage.getItem(draftKey(selectedId));
       setVal(saved ?? "");
       setSavedDraft(false);
-    } catch {}
+    } catch {
+      // localStorage may be unavailable (private mode / disabled) — drafts are best-effort
+    }
   }, [selectedId]);
 
   // Debounced autosave of the draft (300ms after the last keystroke)
@@ -49,7 +51,9 @@ export const ChallengeDetail = () => {
           localStorage.removeItem(draftKey(selectedId));
           setSavedDraft(false);
         }
-      } catch {}
+      } catch {
+        // localStorage may be unavailable (private mode / disabled) — drafts are best-effort
+      }
     }, 300);
     return () => window.clearTimeout(id);
   }, [val, selectedId]);
@@ -77,7 +81,9 @@ export const ChallengeDetail = () => {
     try {
       await addProgress(c.id, n);
       setVal("");
-      try { localStorage.removeItem(draftKey(c.id)); } catch {}
+      try { localStorage.removeItem(draftKey(c.id)); } catch {
+        // localStorage may be unavailable (private mode / disabled) — drafts are best-effort
+      }
       setSavedDraft(false);
       toast.success(t("cd.added", { n, unit: c.unit }));
     } catch (e) {
