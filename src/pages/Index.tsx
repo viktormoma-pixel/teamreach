@@ -1,4 +1,5 @@
 import { useEffect, useRef, useState } from "react";
+import { useNavigate } from "react-router-dom";
 import { AppProvider, useApp } from "@/store/app";
 import { I18nProvider, useI18n } from "@/i18n";
 import { Onboarding } from "@/components/Onboarding";
@@ -10,12 +11,30 @@ import { TabBar } from "@/components/TabBar";
 import { EmailAuthScreen } from "@/components/EmailAuthScreen";
 import { UpdatePasswordScreen } from "@/components/UpdatePasswordScreen";
 
-const Shell = () => {
-  const { auth, onboarded, tab, selectedId, passwordRecovery, signInWithTelegram } = useApp();
+export const Shell = ({ deepLinkChallengeId }: { deepLinkChallengeId?: string }) => {
+  const { auth, onboarded, tab, selectedId, challengesReady, passwordRecovery, signInWithTelegram, setSelectedId } = useApp();
+  const navigate = useNavigate();
   const { t } = useI18n();
   const [telegramLoading, setTelegramLoading] = useState(false);
   // Prevents re-auto-login after the user explicitly signs out within the same session.
   const didAutoLoginRef = useRef(false);
+  // Tracks whether we auto-selected a challenge from the URL deep-link.
+  const deepLinkSelectedRef = useRef(false);
+
+  // Auto-select the challenge once data is ready when entering via deep-link.
+  useEffect(() => {
+    if (deepLinkChallengeId && challengesReady && !deepLinkSelectedRef.current) {
+      deepLinkSelectedRef.current = true;
+      setSelectedId(deepLinkChallengeId);
+    }
+  }, [deepLinkChallengeId, challengesReady, setSelectedId]);
+
+  // Navigate to home when user presses back after arriving via deep-link.
+  useEffect(() => {
+    if (deepLinkSelectedRef.current && !selectedId) {
+      navigate("/");
+    }
+  }, [selectedId, navigate]);
 
   // Clear the Telegram loading flag once auth resolves (success or sign-out).
   useEffect(() => {

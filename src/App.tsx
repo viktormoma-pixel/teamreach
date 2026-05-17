@@ -10,6 +10,7 @@ import NotFound from "./pages/NotFound.tsx";
 import Privacy from "./pages/Privacy.tsx";
 import Impressum from "./pages/Impressum.tsx";
 import Contact from "./pages/Contact.tsx";
+import ChallengePage from "./pages/ChallengePage.tsx";
 
 const queryClient = new QueryClient();
 
@@ -25,6 +26,7 @@ const App = () => (
         <I18nProvider>
           <Routes>
             <Route path="/" element={<Index />} />
+            <Route path="/challenge/:challengeId" element={<ChallengePage />} />
             <Route path="/privacy" element={<Privacy />} />
             <Route path="/impressum" element={<Impressum />} />
             <Route path="/contact" element={<Contact />} />

@@ -3,7 +3,7 @@ import { useApp } from "@/store/app";
 import { useI18n } from "@/i18n";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
-import { ArrowLeft, Flame, Users, Calendar, Trash2, Loader2 } from "lucide-react";
+import { ArrowLeft, Flame, Users, Calendar, Trash2, Loader2, Share2 } from "lucide-react";
 import { toast } from "sonner";
 import { ParticipantsRanking } from "./ParticipantsRanking";
 import {
@@ -60,6 +60,16 @@ export const ChallengeDetail = () => {
   const pct = Math.round((c.current / c.goal) * 100);
   const maxBar = Math.max(...c.history.map((h) => h.value), 1);
 
+  const shareChallenge = async () => {
+    const url = `${window.location.origin}/challenge/${c.id}`;
+    try {
+      await navigator.clipboard.writeText(url);
+      toast.success(t("cd.shareCopied"));
+    } catch {
+      toast.error(t("cd.shareError"));
+    }
+  };
+
   const submit = async () => {
     const n = Number(val);
     if (!n || n <= 0) return toast.error(t("cd.errPositive"));
@@ -93,47 +103,54 @@ export const ChallengeDetail = () => {
             <ArrowLeft className="h-5 w-5" />
           </button>
           <span className="text-xs font-semibold opacity-70 uppercase tracking-wider">{t("cd.label")}</span>
-          {isAdmin ? (
-            <AlertDialog>
-              <AlertDialogTrigger asChild>
-                <button
-                  className="h-10 w-10 rounded-full bg-background/60 grid place-items-center text-destructive"
-                  aria-label={t("cd.deleteAria")}
-                >
-                  <Trash2 className="h-5 w-5" />
-                </button>
-              </AlertDialogTrigger>
-              <AlertDialogContent>
-                <AlertDialogHeader>
-                  <AlertDialogTitle>{t("cd.deleteTitle")}</AlertDialogTitle>
-                  <AlertDialogDescription>{t("cd.deleteDesc", { title: c.title })}</AlertDialogDescription>
-                </AlertDialogHeader>
-                <AlertDialogFooter>
-                  <AlertDialogCancel disabled={deleting}>{t("common.cancel")}</AlertDialogCancel>
-                  <AlertDialogAction
-                    disabled={deleting}
-                    className="bg-destructive text-destructive-foreground hover:bg-destructive/90"
-                    onClick={async () => {
-                      setDeleting(true);
-                      try {
-                        await deleteChallenge(c.id);
-                        toast.success(t("cd.deleted"));
-                      } catch (e) {
-                        toast.error(e instanceof Error ? e.message : "Failed");
-                      } finally {
-                        setDeleting(false);
-                      }
-                    }}
+          <div className="flex items-center gap-2">
+            <button
+              onClick={shareChallenge}
+              className="h-10 w-10 rounded-full bg-background/60 grid place-items-center"
+              aria-label={t("cd.shareAria")}
+            >
+              <Share2 className="h-5 w-5" />
+            </button>
+            {isAdmin && (
+              <AlertDialog>
+                <AlertDialogTrigger asChild>
+                  <button
+                    className="h-10 w-10 rounded-full bg-background/60 grid place-items-center text-destructive"
+                    aria-label={t("cd.deleteAria")}
                   >
-                    {deleting ? <Loader2 className="h-4 w-4 animate-spin mr-2" /> : null}
-                    {t("cd.deleteConfirm")}
-                  </AlertDialogAction>
-                </AlertDialogFooter>
-              </AlertDialogContent>
-            </AlertDialog>
-          ) : (
-            <div className="h-10 w-10" />
-          )}
+                    <Trash2 className="h-5 w-5" />
+                  </button>
+                </AlertDialogTrigger>
+                <AlertDialogContent>
+                  <AlertDialogHeader>
+                    <AlertDialogTitle>{t("cd.deleteTitle")}</AlertDialogTitle>
+                    <AlertDialogDescription>{t("cd.deleteDesc", { title: c.title })}</AlertDialogDescription>
+                  </AlertDialogHeader>
+                  <AlertDialogFooter>
+                    <AlertDialogCancel disabled={deleting}>{t("common.cancel")}</AlertDialogCancel>
+                    <AlertDialogAction
+                      disabled={deleting}
+                      className="bg-destructive text-destructive-foreground hover:bg-destructive/90"
+                      onClick={async () => {
+                        setDeleting(true);
+                        try {
+                          await deleteChallenge(c.id);
+                          toast.success(t("cd.deleted"));
+                        } catch (e) {
+                          toast.error(e instanceof Error ? e.message : "Failed");
+                        } finally {
+                          setDeleting(false);
+                        }
+                      }}
+                    >
+                      {deleting ? <Loader2 className="h-4 w-4 animate-spin mr-2" /> : null}
+                      {t("cd.deleteConfirm")}
+                    </AlertDialogAction>
+                  </AlertDialogFooter>
+                </AlertDialogContent>
+              </AlertDialog>
+            )}
+          </div>
         </div>
 
         <div className="mt-6 text-center">
