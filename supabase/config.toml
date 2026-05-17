@@ -1,1 +1,7 @@
 project_id = "yllazbjzoehgigefekja"
+
+# auth-telegram is the Telegram Mini App login bootstrap: the caller has no
+# Supabase JWT yet, so the gateway must not enforce one. Auth is done inside
+# the function via Telegram initData HMAC-SHA256 verification.
+[functions.auth-telegram]
+verify_jwt = false
