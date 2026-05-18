@@ -1,5 +1,5 @@
 import type { Challenge } from "@/data/challenges";
-import { ChevronRight, Users } from "lucide-react";
+import { ChevronRight, Lock, Users } from "lucide-react";
 import { useI18n } from "@/i18n";
 import { Button } from "@/components/ui/button";
 
@@ -14,18 +14,30 @@ export const ChallengeCard = ({
   c,
   onClick,
   onJoin,
+  isSubscriber,
+  onPaywall,
 }: {
   c: Challenge;
   onClick: () => void;
   onJoin?: () => void | Promise<void>;
+  /** Whether the current user has an active premium subscription. */
+  isSubscriber?: boolean;
+  /** Called when a non-subscriber taps a subscribers-only challenge. */
+  onPaywall?: () => void;
 }) => {
   const { t } = useI18n();
   const pct = Math.round((c.current / c.goal) * 100);
-  const showJoin = !c.joined && !!onJoin;
+
+  // Gate: lock the card when the challenge is subscribers-only, the user is
+  // not a subscriber, and a paywall handler is provided (native only).
+  const locked = c.subscribersOnly && !isSubscriber && !!onPaywall;
+  const handleClick = locked ? onPaywall! : onClick;
+
+  const showJoin = !c.joined && !!onJoin && !locked;
 
   return (
     <button
-      onClick={onClick}
+      onClick={handleClick}
       className={`${surfaceClass[c.surface]} w-full text-left rounded-3xl p-5 shadow-soft transition active:scale-[0.98]`}
     >
       <div className="flex items-start justify-between">
@@ -37,7 +49,11 @@ export const ChallengeCard = ({
           </div>
         </div>
         <div className="h-9 w-9 rounded-full bg-background/60 grid place-items-center">
-          <ChevronRight className="h-4 w-4" />
+          {c.subscribersOnly ? (
+            <Lock className="h-4 w-4" />
+          ) : (
+            <ChevronRight className="h-4 w-4" />
+          )}
         </div>
       </div>
 
@@ -50,6 +66,20 @@ export const ChallengeCard = ({
           <div className="h-2 rounded-full bg-background/50 overflow-hidden">
             <div className="h-full bg-foreground/80 rounded-full transition-all" style={{ width: `${pct}%` }} />
           </div>
+        </div>
+      ) : locked ? (
+        <div className="mt-5 flex justify-end">
+          <Button
+            size="sm"
+            className="rounded-full h-9 px-5 gap-1.5"
+            onClick={(e) => {
+              e.stopPropagation();
+              onPaywall!();
+            }}
+          >
+            <Lock className="h-3.5 w-3.5" />
+            {t("sub.subscribe")}
+          </Button>
         </div>
       ) : showJoin ? (
         <div className="mt-5 flex justify-end">

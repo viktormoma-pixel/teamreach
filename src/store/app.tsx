@@ -12,6 +12,7 @@ export type NewChallengeInput = {
   goal: number;
   daysLeft: number;
   surface?: Challenge["surface"];
+  subscribersOnly?: boolean;
 };
 
 type AuthState =
@@ -188,6 +189,7 @@ export const AppProvider = ({ children }: { children: ReactNode }) => {
           surface: (c.surface as Challenge["surface"]) ?? "blue",
           joined: cParts.some((p) => p.user_id === me),
           members: cParts.length,
+          subscribersOnly: (c as { subscribers_only?: boolean }).subscribers_only ?? false,
           history: buildHistory(myEntries),
           participants,
         };
@@ -439,7 +441,9 @@ export const AppProvider = ({ children }: { children: ReactNode }) => {
       deadline: deadline.toISOString().slice(0, 10),
       surface,
       created_by: user.id,
-    }).select("id").single();
+      subscribers_only: input.subscribersOnly ?? false,
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any
+    } as any).select("id").single();
     if (error) throw error;
 
     // Auto-join creator

@@ -181,6 +181,15 @@ export const translations: Record<Lang, Dict> = {
     "cc.errUnit": "Pick a unit",
     "cc.errGoal": "Goal must be > 0",
     "cc.errDeadline": "Pick a deadline",
+    "cc.fSubscribersOnly": "Subscribers only",
+    "cc.fSubscribersOnlyDesc": "Only premium subscribers can join",
+
+    // Subscription / paywall
+    "sub.subscribe": "Subscribe",
+    "sub.restore": "Restore purchases",
+    "sub.title": "Go Premium",
+    "sub.description": "Unlock exclusive challenges and support the app.",
+    "sub.comingSoon": "Premium subscriptions are coming soon!",
 
     // Cookie consent banner
     "cookie.title": "We use analytics cookies",
@@ -354,6 +363,15 @@ export const translations: Record<Lang, Dict> = {
     "cc.errUnit": "Выберите единицу",
     "cc.errGoal": "Цель должна быть > 0",
     "cc.errDeadline": "Выберите дедлайн",
+    "cc.fSubscribersOnly": "Только для подписчиков",
+    "cc.fSubscribersOnlyDesc": "Только платные подписчики могут участвовать",
+
+    // Subscription / paywall
+    "sub.subscribe": "Подписаться",
+    "sub.restore": "Восстановить покупки",
+    "sub.title": "Подписка Premium",
+    "sub.description": "Открывайте эксклюзивные челленджи и поддерживайте приложение.",
+    "sub.comingSoon": "Подписка Premium скоро появится!",
 
     // Cookie consent banner
     "cookie.title": "Мы используем аналитические cookie",
@@ -527,6 +545,15 @@ export const translations: Record<Lang, Dict> = {
     "cc.errUnit": "Einheit auswählen",
     "cc.errGoal": "Ziel muss > 0 sein",
     "cc.errDeadline": "Deadline auswählen",
+    "cc.fSubscribersOnly": "Nur Abonnenten",
+    "cc.fSubscribersOnlyDesc": "Nur zahlende Abonnenten können beitreten",
+
+    // Subscription / paywall
+    "sub.subscribe": "Abonnieren",
+    "sub.restore": "Käufe wiederherstellen",
+    "sub.title": "Premium werden",
+    "sub.description": "Schalte exklusive Challenges frei und unterstütze die App.",
+    "sub.comingSoon": "Premium-Abonnements kommen bald!",
 
     // Cookie consent banner
     "cookie.title": "Wir verwenden Analyse-Cookies",

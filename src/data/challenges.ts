@@ -16,6 +16,7 @@ export type Challenge = {
   surface: "blue" | "mint" | "peach" | "lilac";
   joined: boolean;
   members: number;
+  subscribersOnly: boolean;
   history: { day: string; value: number }[];
   participants: Participant[];
 };

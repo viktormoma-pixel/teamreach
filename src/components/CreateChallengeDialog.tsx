@@ -4,6 +4,7 @@ import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogDescription, Di
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Button } from "@/components/ui/button";
+import { Switch } from "@/components/ui/switch";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { useApp } from "@/store/app";
 import { useI18n } from "@/i18n";
@@ -31,11 +32,12 @@ export const CreateChallengeDialog = ({
   const [unit, setUnit] = useState("reps");
   const [goal, setGoal] = useState("");
   const [deadline, setDeadline] = useState<Date | undefined>();
+  const [subscribersOnly, setSubscribersOnly] = useState(false);
 
   const dateLocale = lang === "ru" ? ru : lang === "de" ? de : enUS;
 
   const reset = () => {
-    setTitle(""); setEmoji(""); setUnit("reps"); setGoal(""); setDeadline(undefined);
+    setTitle(""); setEmoji(""); setUnit("reps"); setGoal(""); setDeadline(undefined); setSubscribersOnly(false);
   };
 
   const schema = z.object({
@@ -67,6 +69,7 @@ export const CreateChallengeDialog = ({
         unit: parsed.data.unit,
         goal: parsed.data.goal,
         daysLeft: days,
+        subscribersOnly,
       });
       toast.success(t("cc.created"));
       reset();
@@ -136,6 +139,17 @@ export const CreateChallengeDialog = ({
                 />
               </PopoverContent>
             </Popover>
+          </div>
+
+          <div className="flex items-center justify-between rounded-2xl border border-border px-4 py-3">
+            <div>
+              <p className="text-sm font-medium">{t("cc.fSubscribersOnly")}</p>
+              <p className="text-xs text-muted-foreground mt-0.5">{t("cc.fSubscribersOnlyDesc")}</p>
+            </div>
+            <Switch
+              checked={subscribersOnly}
+              onCheckedChange={setSubscribersOnly}
+            />
           </div>
 
           <DialogFooter className="gap-2 pt-2">
