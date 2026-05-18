@@ -34,6 +34,7 @@ export const initialChallenges: Challenge[] = [
     surface: "blue",
     joined: true,
     members: 12,
+    subscribersOnly: false,
     history: [
       { day: "Mon", value: 20 },
       { day: "Tue", value: 25 },
@@ -64,6 +65,7 @@ export const initialChallenges: Challenge[] = [
     surface: "mint",
     joined: true,
     members: 8,
+    subscribersOnly: false,
     history: [
       { day: "Mon", value: 4 },
       { day: "Tue", value: 0 },
@@ -93,6 +95,7 @@ export const initialChallenges: Challenge[] = [
     surface: "lilac",
     joined: false,
     members: 24,
+    subscribersOnly: false,
     history: [],
     participants: [
       { name: "Lena", value: 180 },
@@ -112,6 +115,7 @@ export const initialChallenges: Challenge[] = [
     surface: "peach",
     joined: false,
     members: 16,
+    subscribersOnly: false,
     history: [],
     participants: [
       { name: "Maya", value: 42 },
