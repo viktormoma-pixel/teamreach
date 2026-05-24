@@ -442,8 +442,7 @@ export const AppProvider = ({ children }: { children: ReactNode }) => {
       surface,
       created_by: user.id,
       subscribers_only: input.subscribersOnly ?? false,
-    // eslint-disable-next-line @typescript-eslint/no-explicit-any
-    } as any).select("id").single();
+    }).select("id").single();
     if (error) throw error;
 
     // Auto-join creator
@@ -455,13 +454,10 @@ export const AppProvider = ({ children }: { children: ReactNode }) => {
   };
 
   const deleteChallenge = async (id: string) => {
-    // Soft-delete: marking archived_at hides the challenge from RLS reads but
-    // keeps participants + progress rows intact. A future "restore" UI can
-    // unset archived_at to recover the challenge.
-    const { error } = await supabase
-      .from("challenges")
-      .update({ archived_at: new Date().toISOString() })
-      .eq("id", id);
+    // Soft-delete via SECURITY DEFINER RPC: the direct PATCH was blocked by
+    // PostgreSQL 17 applying the SELECT policy (archived_at IS NULL) as a
+    // WITH CHECK on the new row, even though the admin UPDATE policy passed.
+    const { error } = await supabase.rpc("archive_challenge", { _id: id });
     if (error) throw error;
     mixpanel.track("challenge_deleted", { challenge_id: id });
     setSelectedId(null);

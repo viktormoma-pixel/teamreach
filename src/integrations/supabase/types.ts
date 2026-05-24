@@ -5,7 +5,7 @@ export type Json =
   | null
   | { [key: string]: Json | undefined }
   | Json[]
- 
+
 export type Database = {
   // Allows to automatically instantiate createClient with right options
   // instead of createClient<Database, { PostgrestVersion: 'XX' }>(URL, KEY)
@@ -52,6 +52,7 @@ export type Database = {
           emoji: string
           goal: number
           id: string
+          subscribers_only: boolean
           surface: string
           title: string
           unit: string
@@ -65,6 +66,7 @@ export type Database = {
           emoji?: string
           goal: number
           id?: string
+          subscribers_only?: boolean
           surface?: string
           title: string
           unit: string
@@ -78,6 +80,7 @@ export type Database = {
           emoji?: string
           goal?: number
           id?: string
+          subscribers_only?: boolean
           surface?: string
           title?: string
           unit?: string
@@ -94,6 +97,7 @@ export type Database = {
           language_code: string | null
           last_name: string | null
           photo_url: string | null
+          subscription_tier: string
           telegram_id: number | null
           updated_at: string
           username: string | null
@@ -106,6 +110,7 @@ export type Database = {
           language_code?: string | null
           last_name?: string | null
           photo_url?: string | null
+          subscription_tier?: string
           telegram_id?: number | null
           updated_at?: string
           username?: string | null
@@ -118,6 +123,7 @@ export type Database = {
           language_code?: string | null
           last_name?: string | null
           photo_url?: string | null
+          subscription_tier?: string
           telegram_id?: number | null
           updated_at?: string
           username?: string | null
@@ -159,6 +165,33 @@ export type Database = {
           },
         ]
       }
+      push_tokens: {
+        Row: {
+          created_at: string
+          id: string
+          platform: string
+          token: string
+          updated_at: string
+          user_id: string
+        }
+        Insert: {
+          created_at?: string
+          id?: string
+          platform: string
+          token: string
+          updated_at?: string
+          user_id: string
+        }
+        Update: {
+          created_at?: string
+          id?: string
+          platform?: string
+          token?: string
+          updated_at?: string
+          user_id?: string
+        }
+        Relationships: []
+      }
       user_roles: {
         Row: {
           created_at: string
@@ -185,6 +218,7 @@ export type Database = {
       [_ in never]: never
     }
     Functions: {
+      archive_challenge: { Args: { _id: string }; Returns: undefined }
       has_role: {
         Args: {
           _role: Database["public"]["Enums"]["app_role"]
@@ -201,11 +235,11 @@ export type Database = {
     }
   }
 }
- 
+
 type DatabaseWithoutInternals = Omit<Database, "__InternalSupabase">
- 
+
 type DefaultSchema = DatabaseWithoutInternals[Extract<keyof Database, "public">]
- 
+
 export type Tables<
   DefaultSchemaTableNameOrOptions extends
     | keyof (DefaultSchema["Tables"] & DefaultSchema["Views"])
@@ -234,7 +268,7 @@ export type Tables<
       ? R
       : never
     : never
- 
+
 export type TablesInsert<
   DefaultSchemaTableNameOrOptions extends
     | keyof DefaultSchema["Tables"]
@@ -259,7 +293,7 @@ export type TablesInsert<
       ? I
       : never
     : never
- 
+
 export type TablesUpdate<
   DefaultSchemaTableNameOrOptions extends
     | keyof DefaultSchema["Tables"]
@@ -284,7 +318,7 @@ export type TablesUpdate<
       ? U
       : never
     : never
- 
+
 export type Enums<
   DefaultSchemaEnumNameOrOptions extends
     | keyof DefaultSchema["Enums"]
@@ -301,7 +335,7 @@ export type Enums<
   : DefaultSchemaEnumNameOrOptions extends keyof DefaultSchema["Enums"]
     ? DefaultSchema["Enums"][DefaultSchemaEnumNameOrOptions]
     : never
- 
+
 export type CompositeTypes<
   PublicCompositeTypeNameOrOptions extends
     | keyof DefaultSchema["CompositeTypes"]
@@ -318,7 +352,7 @@ export type CompositeTypes<
   : PublicCompositeTypeNameOrOptions extends keyof DefaultSchema["CompositeTypes"]
     ? DefaultSchema["CompositeTypes"][PublicCompositeTypeNameOrOptions]
     : never
- 
+
 export const Constants = {
   public: {
     Enums: {
