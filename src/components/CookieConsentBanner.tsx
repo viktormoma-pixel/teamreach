@@ -1,6 +1,7 @@
 import { useState, useEffect } from "react";
 import { mixpanel } from "@/lib/mixpanel";
 import { useI18n } from "@/i18n";
+import * as amplitude from "@amplitude/unified";
 
 const CONSENT_KEY = "teamreach.analytics_consent";
 
@@ -23,12 +24,14 @@ export function CookieConsentBanner() {
     mixpanel.opt_in_tracking();
     mixpanel.track("analytics_consent_given");
     mixpanel.track_pageview();
+    amplitude.track("Analytics Consent Given");
     setVisible(false);
   };
 
   const decline = () => {
     localStorage.setItem(CONSENT_KEY, "false");
     mixpanel.opt_out_tracking();
+    amplitude.track("Analytics Consent Declined");
     setVisible(false);
   };
 

@@ -19,6 +19,13 @@ export type Challenge = {
   subscribersOnly: boolean;
   history: { day: string; value: number }[];
   participants: Participant[];
+  // --- streak/PIN challenges (additive; numeric challenges leave these unset) ---
+  /** "numeric" (default, log amounts) or "streak" (check off days). */
+  type?: "numeric" | "streak";
+  /** ISO date strings (YYYY-MM-DD) the current user has checked off. Streak only. */
+  checkedDays?: string[];
+  /** True when an admin set a PIN; joining requires entering it. */
+  pinProtected?: boolean;
 };
 
 export const initialChallenges: Challenge[] = [

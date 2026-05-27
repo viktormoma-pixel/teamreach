@@ -1,7 +1,9 @@
 import type { Challenge } from "@/data/challenges";
-import { ChevronRight, Lock, Users } from "lucide-react";
+import { ChevronRight, Lock, Users, Flame } from "lucide-react";
 import { useI18n } from "@/i18n";
 import { Button } from "@/components/ui/button";
+import { lastNDays, currentStreak } from "@/lib/streak";
+import * as amplitude from "@amplitude/unified";
 
 const surfaceClass: Record<Challenge["surface"], string> = {
   blue: "bg-surface-blue text-surface-blue-foreground",
@@ -31,7 +33,12 @@ export const ChallengeCard = ({
   // Gate: lock the card when the challenge is subscribers-only, the user is
   // not a subscriber, and a paywall handler is provided (native only).
   const locked = c.subscribersOnly && !isSubscriber && !!onPaywall;
-  const handleClick = locked ? onPaywall! : onClick;
+  const handleClick = locked
+    ? () => {
+        amplitude.track("Subscribers Only Challenge Viewed", { challenge_id: c.id });
+        onPaywall!();
+      }
+    : onClick;
 
   const showJoin = !c.joined && !!onJoin && !locked;
 
@@ -49,7 +56,7 @@ export const ChallengeCard = ({
           </div>
         </div>
         <div className="h-9 w-9 rounded-full bg-background/60 grid place-items-center">
-          {c.subscribersOnly ? (
+          {c.subscribersOnly || c.pinProtected ? (
             <Lock className="h-4 w-4" />
           ) : (
             <ChevronRight className="h-4 w-4" />
@@ -57,7 +64,27 @@ export const ChallengeCard = ({
         </div>
       </div>
 
-      {c.joined ? (
+      {c.type === "streak" && c.joined ? (
+        <div className="mt-5">
+          <div className="flex justify-between text-sm font-semibold mb-2">
+            <span>{c.current} / {c.goal} {t("streak.daysUnit")}</span>
+            <span className="flex items-center gap-1">
+              <Flame className="h-3.5 w-3.5" /> {currentStreak(c.checkedDays)}
+            </span>
+          </div>
+          <div className="flex gap-1.5">
+            {lastNDays(7).map((d) => {
+              const done = c.checkedDays?.includes(d);
+              return (
+                <span
+                  key={d}
+                  className={`h-2.5 flex-1 rounded-full ${done ? "bg-foreground/80" : "bg-background/50"}`}
+                />
+              );
+            })}
+          </div>
+        </div>
+      ) : c.joined ? (
         <div className="mt-5">
           <div className="flex justify-between text-sm font-semibold mb-1.5">
             <span>{c.current} / {c.goal} {c.unit}</span>
@@ -74,6 +101,7 @@ export const ChallengeCard = ({
             className="rounded-full h-9 px-5 gap-1.5"
             onClick={(e) => {
               e.stopPropagation();
+              amplitude.track("Subscribers Only Challenge Viewed", { challenge_id: c.id });
               onPaywall!();
             }}
           >

@@ -46,12 +46,15 @@ export type Database = {
       challenges: {
         Row: {
           archived_at: string | null
+          challenge_type: string
           created_at: string
           created_by: string | null
           deadline: string
           emoji: string
           goal: number
           id: string
+          pin_hash: string | null
+          pin_protected: boolean | null
           subscribers_only: boolean
           surface: string
           title: string
@@ -60,12 +63,15 @@ export type Database = {
         }
         Insert: {
           archived_at?: string | null
+          challenge_type?: string
           created_at?: string
           created_by?: string | null
           deadline: string
           emoji?: string
           goal: number
           id?: string
+          pin_hash?: string | null
+          pin_protected?: boolean | null
           subscribers_only?: boolean
           surface?: string
           title: string
@@ -74,12 +80,15 @@ export type Database = {
         }
         Update: {
           archived_at?: string | null
+          challenge_type?: string
           created_at?: string
           created_by?: string | null
           deadline?: string
           emoji?: string
           goal?: number
           id?: string
+          pin_hash?: string | null
+          pin_protected?: boolean | null
           subscribers_only?: boolean
           surface?: string
           title?: string
@@ -87,6 +96,38 @@ export type Database = {
           updated_at?: string
         }
         Relationships: []
+      }
+      day_checks: {
+        Row: {
+          challenge_id: string
+          checked_date: string
+          created_at: string
+          id: string
+          user_id: string
+        }
+        Insert: {
+          challenge_id: string
+          checked_date: string
+          created_at?: string
+          id?: string
+          user_id: string
+        }
+        Update: {
+          challenge_id?: string
+          checked_date?: string
+          created_at?: string
+          id?: string
+          user_id?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "day_checks_challenge_id_fkey"
+            columns: ["challenge_id"]
+            isOneToOne: false
+            referencedRelation: "challenges"
+            referencedColumns: ["id"]
+          },
+        ]
       }
       profiles: {
         Row: {
@@ -224,6 +265,14 @@ export type Database = {
           _role: Database["public"]["Enums"]["app_role"]
           _user_id: string
         }
+        Returns: boolean
+      }
+      set_challenge_pin: {
+        Args: { _challenge_id: string; _pin: string }
+        Returns: undefined
+      }
+      verify_challenge_pin: {
+        Args: { _challenge_id: string; _pin: string }
         Returns: boolean
       }
     }

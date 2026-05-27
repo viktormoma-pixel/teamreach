@@ -1,11 +1,16 @@
-import { useEffect, useState } from "react";
+import { useEffect, useRef, useState } from "react";
 import { useApp } from "@/store/app";
 import { useI18n } from "@/i18n";
+import * as amplitude from "@amplitude/unified";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
-import { ArrowLeft, Flame, Users, Calendar, Trash2, Loader2, Share2 } from "lucide-react";
+import { ArrowLeft, Flame, Users, Calendar, Trash2, Loader2, Share2, Check } from "lucide-react";
 import { toast } from "sonner";
 import { ParticipantsRanking } from "./ParticipantsRanking";
+import { PinEntryDialog } from "./PinEntryDialog";
+import { lastNDays, currentStreak, todayISO } from "@/lib/streak";
+import { ru, de, enUS } from "date-fns/locale";
+import { format } from "date-fns";
 import {
   AlertDialog, AlertDialogAction, AlertDialogCancel, AlertDialogContent,
   AlertDialogDescription, AlertDialogFooter, AlertDialogHeader, AlertDialogTitle, AlertDialogTrigger,
@@ -21,11 +26,15 @@ const surfaceClass: Record<string, string> = {
 const draftKey = (id: string) => `teamreach.draft.${id}`;
 
 export const ChallengeDetail = () => {
-  const { selectedId, setSelectedId, challenges, addProgress, deleteChallenge, isAdmin } = useApp();
-  const { t } = useI18n();
+  const { selectedId, setSelectedId, challenges, addProgress, deleteChallenge, isAdmin, toggleDayCheck, joinChallenge } = useApp();
+  const { t, lang } = useI18n();
   const [val, setVal] = useState("");
   const [savedDraft, setSavedDraft] = useState(false);
   const [deleting, setDeleting] = useState(false);
+  const [pinOpen, setPinOpen] = useState(false);
+  // Day the user tapped before the PIN gate resolved (streak join flow).
+  const pendingDate = useRef<string | null>(null);
+  const dateLocale = lang === "ru" ? ru : lang === "de" ? de : enUS;
 
   // Restore draft when entering a challenge
   useEffect(() => {
@@ -69,6 +78,7 @@ export const ChallengeDetail = () => {
     try {
       await navigator.clipboard.writeText(url);
       toast.success(t("cd.shareCopied"));
+      amplitude.track("Challenge Shared", { challenge_id: c.id });
     } catch {
       toast.error(t("cd.shareError"));
     }
@@ -95,6 +105,31 @@ export const ChallengeDetail = () => {
       } else {
         toast.error(code || "Failed");
       }
+    }
+  };
+
+  // Streak: toggle a day's check-off. Joining is required to participate, so
+  // a non-joined user is routed through join (and the PIN gate if protected)
+  // before the tapped day is recorded.
+  const toggleDay = async (date: string) => {
+    if (!c.joined) {
+      if (c.pinProtected) {
+        pendingDate.current = date;
+        setPinOpen(true);
+        return;
+      }
+      try {
+        await joinChallenge(c.id);
+        await toggleDayCheck(c.id, date);
+      } catch (e) {
+        toast.error(e instanceof Error ? e.message : "Failed");
+      }
+      return;
+    }
+    try {
+      await toggleDayCheck(c.id, date);
+    } catch (e) {
+      toast.error(e instanceof Error ? e.message : "Failed");
     }
   };
 
@@ -180,52 +215,109 @@ export const ChallengeDetail = () => {
       </div>
 
       <div className="px-5 mt-6 space-y-5">
-        <div className="rounded-3xl bg-card border border-border p-5 shadow-soft">
-          <p className="font-bold mb-3">{t("cd.howMuch")}</p>
-          <div className="flex gap-2">
-            <Input
-              type="number"
-              inputMode="numeric"
-              placeholder={t("cd.placeholder", { unit: c.unit })}
-              value={val}
-              onChange={(e) => setVal(e.target.value)}
-              className="h-12 rounded-2xl border-border bg-secondary text-base"
-            />
-            <Button onClick={submit} className="h-12 px-6 rounded-2xl">{t("common.add")}</Button>
+        {c.type === "streak" ? (
+          <div className="rounded-3xl bg-card border border-border p-5 shadow-soft">
+            <div className="flex items-center justify-between mb-1">
+              <p className="font-bold">{t("streak.markTitle")}</p>
+              <span className="flex items-center gap-1 text-sm font-semibold text-primary">
+                <Flame className="h-4 w-4" /> {t("streak.count", { n: currentStreak(c.checkedDays) })}
+              </span>
+            </div>
+            <p className="text-xs text-muted-foreground mb-4">{t("streak.markDesc")}</p>
+            <div className="grid grid-cols-7 gap-2">
+              {lastNDays(14).map((d) => {
+                const done = c.checkedDays?.includes(d);
+                const isToday = d === todayISO();
+                return (
+                  <button
+                    key={d}
+                    onClick={() => void toggleDay(d)}
+                    aria-pressed={done}
+                    aria-label={format(new Date(d), "PPP", { locale: dateLocale })}
+                    className={[
+                      "aspect-square rounded-2xl grid place-items-center transition active:scale-95 border",
+                      done
+                        ? "bg-gradient-primary text-primary-foreground border-transparent"
+                        : "bg-secondary text-muted-foreground border-border",
+                      isToday && !done ? "ring-2 ring-primary/60" : "",
+                    ].join(" ")}
+                  >
+                    {done ? (
+                      <Check className="h-4 w-4" />
+                    ) : (
+                      <span className="text-xs font-semibold">{new Date(d).getDate()}</span>
+                    )}
+                  </button>
+                );
+              })}
+            </div>
           </div>
-          {savedDraft && (
-            <p className="mt-2 text-xs text-muted-foreground">{t("cd.draftSaved")}</p>
-          )}
-        </div>
-
-        <div className="rounded-3xl bg-card border border-border p-5 shadow-soft">
-          <div className="flex items-center justify-between mb-4">
-            <p className="font-bold">{t("cd.thisWeek")}</p>
-            <Flame className="h-4 w-4 text-primary" />
-          </div>
-          <div className="flex items-end justify-between gap-2 h-32">
-            {(c.history.length ? c.history : Array.from({ length: 7 }, (_, i) => ({ day: ["Mon","Tue","Wed","Thu","Fri","Sat","Sun"][i], value: 0 }))).map((h, i) => (
-              <div key={i} className="flex-1 flex flex-col items-center gap-2">
-                <div className="w-full flex-1 flex items-end">
-                  <div
-                    className="w-full rounded-t-xl bg-gradient-primary transition-all"
-                    style={{ height: `${(h.value / maxBar) * 100}%`, minHeight: h.value ? 8 : 4, opacity: h.value ? 1 : 0.15 }}
-                  />
-                </div>
-                <span className="text-[10px] text-muted-foreground font-medium">{h.day}</span>
+        ) : (
+          <>
+            <div className="rounded-3xl bg-card border border-border p-5 shadow-soft">
+              <p className="font-bold mb-3">{t("cd.howMuch")}</p>
+              <div className="flex gap-2">
+                <Input
+                  type="number"
+                  inputMode="numeric"
+                  placeholder={t("cd.placeholder", { unit: c.unit })}
+                  value={val}
+                  onChange={(e) => setVal(e.target.value)}
+                  className="h-12 rounded-2xl border-border bg-secondary text-base"
+                />
+                <Button onClick={submit} className="h-12 px-6 rounded-2xl">{t("common.add")}</Button>
               </div>
-            ))}
-          </div>
-        </div>
+              {savedDraft && (
+                <p className="mt-2 text-xs text-muted-foreground">{t("cd.draftSaved")}</p>
+              )}
+            </div>
 
-        <ParticipantsRanking participants={c.participants ?? []} youValue={c.current} unit={c.unit} />
+            <div className="rounded-3xl bg-card border border-border p-5 shadow-soft">
+              <div className="flex items-center justify-between mb-4">
+                <p className="font-bold">{t("cd.thisWeek")}</p>
+                <Flame className="h-4 w-4 text-primary" />
+              </div>
+              <div className="flex items-end justify-between gap-2 h-32">
+                {(c.history.length ? c.history : Array.from({ length: 7 }, (_, i) => ({ day: ["Mon","Tue","Wed","Thu","Fri","Sat","Sun"][i], value: 0 }))).map((h, i) => (
+                  <div key={i} className="flex-1 flex flex-col items-center gap-2">
+                    <div className="w-full flex-1 flex items-end">
+                      <div
+                        className="w-full rounded-t-xl bg-gradient-primary transition-all"
+                        style={{ height: `${(h.value / maxBar) * 100}%`, minHeight: h.value ? 8 : 4, opacity: h.value ? 1 : 0.15 }}
+                      />
+                    </div>
+                    <span className="text-[10px] text-muted-foreground font-medium">{h.day}</span>
+                  </div>
+                ))}
+              </div>
+            </div>
+          </>
+        )}
+
+        <ParticipantsRanking participants={c.participants ?? []} youValue={c.current} unit={c.type === "streak" ? t("streak.daysUnit") : c.unit} />
 
         <div className="rounded-3xl bg-gradient-card text-primary-foreground p-6 shadow-card">
           <p className="text-xs font-semibold uppercase tracking-wider opacity-80">{t("cd.together")}</p>
           <p className="mt-2 text-4xl font-extrabold">{c.totalAll.toLocaleString()}</p>
-          <p className="text-sm opacity-90 mt-1">{t("cd.acrossMembers", { unit: c.unit, n: c.members })}</p>
+          <p className="text-sm opacity-90 mt-1">{t("cd.acrossMembers", { unit: c.type === "streak" ? t("streak.daysUnit") : c.unit, n: c.members })}</p>
         </div>
       </div>
+
+      <PinEntryDialog
+        challengeId={c.id}
+        open={pinOpen}
+        onOpenChange={(v) => { if (!v) { setPinOpen(false); pendingDate.current = null; } }}
+        onVerified={async () => {
+          const date = pendingDate.current;
+          pendingDate.current = null;
+          try {
+            await joinChallenge(c.id);
+            if (date) await toggleDayCheck(c.id, date);
+          } catch (e) {
+            toast.error(e instanceof Error ? e.message : "Failed");
+          }
+        }}
+      />
     </div>
   );
 };

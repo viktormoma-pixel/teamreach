@@ -1,5 +1,6 @@
 import { useApp } from "@/store/app";
 import { useI18n } from "@/i18n";
+import * as amplitude from "@amplitude/unified";
 import { LANGS } from "@/i18n/translations";
 import { Switch } from "@/components/ui/switch";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
@@ -80,6 +81,7 @@ export const Settings = () => {
     try {
       const { error } = await supabase.functions.invoke("delete-account");
       if (error) throw error;
+      amplitude.track("Account Deleted");
       await signOut();
       await resetAll();
       toast.success(t("set.deleted"));
@@ -113,6 +115,7 @@ export const Settings = () => {
         .update({ first_name: trimmed })
         .eq("id", userId);
       if (error) throw error;
+      amplitude.track("Display Name Updated");
       setProfile((p) => (p ? { ...p, first_name: trimmed } : p));
       setEditOpen(false);
       toast.success(t("set.nameSaved"));

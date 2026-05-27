@@ -183,6 +183,26 @@ export const translations: Record<Lang, Dict> = {
     "cc.errDeadline": "Pick a deadline",
     "cc.fSubscribersOnly": "Subscribers only",
     "cc.fSubscribersOnlyDesc": "Only premium subscribers can join",
+    "cc.fType": "Type",
+    "cc.typeNumeric": "Log amounts",
+    "cc.typeStreak": "Check off days",
+    "cc.fGoalDays": "Goal (days)",
+    "cc.fPin": "Access PIN (optional)",
+    "cc.fPinPh": "e.g. 1234",
+    "cc.fPinDesc": "Members must enter this 4-digit PIN to join.",
+    "cc.errPin": "PIN must be 4 digits",
+
+    // Streak challenges
+    "streak.daysUnit": "days",
+    "streak.count": "{n}-day streak",
+    "streak.markTitle": "Mark your days",
+    "streak.markDesc": "Tap a day to check it off.",
+
+    // PIN entry
+    "pin.title": "Enter PIN",
+    "pin.desc": "This challenge is protected. Enter the PIN to join.",
+    "pin.wrong": "Incorrect PIN. Try again.",
+    "pin.confirm": "Join",
 
     // Subscription / paywall
     "sub.subscribe": "Subscribe",
@@ -365,6 +385,26 @@ export const translations: Record<Lang, Dict> = {
     "cc.errDeadline": "Выберите дедлайн",
     "cc.fSubscribersOnly": "Только для подписчиков",
     "cc.fSubscribersOnlyDesc": "Только платные подписчики могут участвовать",
+    "cc.fType": "Тип",
+    "cc.typeNumeric": "Вводить значения",
+    "cc.typeStreak": "Отмечать дни",
+    "cc.fGoalDays": "Цель (дней)",
+    "cc.fPin": "PIN-код доступа (необязательно)",
+    "cc.fPinPh": "напр. 1234",
+    "cc.fPinDesc": "Чтобы присоединиться, участники вводят этот 4-значный PIN-код.",
+    "cc.errPin": "PIN-код должен состоять из 4 цифр",
+
+    // Streak challenges
+    "streak.daysUnit": "дн.",
+    "streak.count": "серия {n} дн.",
+    "streak.markTitle": "Отмечайте дни",
+    "streak.markDesc": "Нажмите на день, чтобы отметить его.",
+
+    // PIN entry
+    "pin.title": "Введите PIN-код",
+    "pin.desc": "Этот челлендж защищён. Введите PIN-код, чтобы присоединиться.",
+    "pin.wrong": "Неверный PIN-код. Попробуйте ещё раз.",
+    "pin.confirm": "Войти",
 
     // Subscription / paywall
     "sub.subscribe": "Подписаться",
@@ -547,6 +587,26 @@ export const translations: Record<Lang, Dict> = {
     "cc.errDeadline": "Deadline auswählen",
     "cc.fSubscribersOnly": "Nur Abonnenten",
     "cc.fSubscribersOnlyDesc": "Nur zahlende Abonnenten können beitreten",
+    "cc.fType": "Typ",
+    "cc.typeNumeric": "Werte erfassen",
+    "cc.typeStreak": "Tage abhaken",
+    "cc.fGoalDays": "Ziel (Tage)",
+    "cc.fPin": "Zugangs-PIN (optional)",
+    "cc.fPinPh": "z. B. 1234",
+    "cc.fPinDesc": "Mitglieder müssen diese 4-stellige PIN eingeben, um beizutreten.",
+    "cc.errPin": "PIN muss 4 Ziffern haben",
+
+    // Streak challenges
+    "streak.daysUnit": "Tage",
+    "streak.count": "{n} Tage Serie",
+    "streak.markTitle": "Markiere deine Tage",
+    "streak.markDesc": "Tippe auf einen Tag, um ihn abzuhaken.",
+
+    // PIN entry
+    "pin.title": "PIN eingeben",
+    "pin.desc": "Diese Challenge ist geschützt. Gib die PIN ein, um beizutreten.",
+    "pin.wrong": "Falsche PIN. Versuche es erneut.",
+    "pin.confirm": "Beitreten",
 
     // Subscription / paywall
     "sub.subscribe": "Abonnieren",

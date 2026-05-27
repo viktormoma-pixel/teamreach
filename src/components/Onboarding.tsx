@@ -6,6 +6,7 @@ import { useApp } from "@/store/app";
 import { useI18n, type Lang } from "@/i18n";
 import { LANGS } from "@/i18n/translations";
 import { Users, TrendingUp, ShieldCheck, ArrowRight } from "lucide-react";
+import * as amplitude from "@amplitude/unified";
 
 export const Onboarding = () => {
   const { setOnboarded } = useApp();
@@ -87,7 +88,14 @@ export const Onboarding = () => {
         size="lg"
         className="h-14 rounded-2xl text-base font-semibold bg-primary hover:bg-primary/90"
         disabled={isLast && !consent}
-        onClick={() => (isLast ? setOnboarded(true) : setStep(step + 1))}
+        onClick={() => {
+          if (isLast) {
+            amplitude.track("Onboarding Completed");
+            setOnboarded(true);
+          } else {
+            setStep(step + 1);
+          }
+        }}
       >
         {isLast ? t("common.getStarted") : t("common.next")}
         <ArrowRight className="ml-2 h-5 w-5" />

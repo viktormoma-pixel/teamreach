@@ -133,15 +133,17 @@ async function verifyAndParseInitData(
 
 async function findOrCreateTelegramUser(
   admin: ReturnType<typeof createClient>,
-  supabaseUrl: string,
-  serviceKey: string,
   telegramUser: TelegramUser,
   emailDomain: string,
 ): Promise<string> {
   const fakeEmail = `${telegramUser.id}@${emailDomain}`;
 
-  // Attempt to create a new user. If the email already exists we get a 422
-  // "already been registered" error and fall through to lookup.
+  // Try to find the user first — avoids a create+collision roundtrip for
+  // returning users, and scales to any number of accounts.
+  const { data: existing } = await admin.auth.admin.getUserByEmail(fakeEmail);
+  if (existing?.user) return existing.user.id;
+
+  // New user — create them.
   const { data: created, error: createErr } = await admin.auth.admin.createUser({
     email: fakeEmail,
     email_confirm: true,
@@ -155,29 +157,14 @@ async function findOrCreateTelegramUser(
 
   if (!createErr) return created.user.id;
 
-  // User already exists — look them up via the admin REST API.
-  // NOTE: for very large user bases, replace this with a dedicated
-  // Postgres function that queries auth.users by email using an index.
+  // Race: another request created the user between our lookup and createUser.
+  // Look up once more to get their id.
   if (!createErr.message.toLowerCase().includes("already been registered")) {
     throw new Error(`createUser failed: ${createErr.message}`);
   }
-
-  const searchRes = await fetch(
-    `${supabaseUrl}/auth/v1/admin/users?page=1&per_page=1000`,
-    {
-      headers: {
-        apikey: serviceKey,
-        Authorization: `Bearer ${serviceKey}`,
-      },
-    },
-  );
-  if (!searchRes.ok) {
-    throw new Error(`user list failed: ${searchRes.status}`);
-  }
-  const searchData = await searchRes.json() as { users: Array<{ id: string; email: string }> };
-  const existing = searchData.users?.find((u) => u.email === fakeEmail);
-  if (!existing) throw new Error("user not found after create collision");
-  return existing.id;
+  const { data: retry } = await admin.auth.admin.getUserByEmail(fakeEmail);
+  if (retry?.user) return retry.user.id;
+  throw new Error("user not found after create collision");
 }
 
 // ---------------------------------------------------------------------------
@@ -236,7 +223,7 @@ Deno.serve(async (req) => {
     // Find or create user (ensures the Supabase account exists before issuing the link)
     let userId: string;
     try {
-      userId = await findOrCreateTelegramUser(admin, SUPABASE_URL, SERVICE_KEY, telegramUser, EMAIL_DOMAIN);
+      userId = await findOrCreateTelegramUser(admin, telegramUser, EMAIL_DOMAIN);
     } catch (err) {
       return json(
         { error: err instanceof Error ? err.message : "user setup failed" },

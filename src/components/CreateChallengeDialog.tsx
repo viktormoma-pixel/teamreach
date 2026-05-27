@@ -33,11 +33,15 @@ export const CreateChallengeDialog = ({
   const [goal, setGoal] = useState("");
   const [deadline, setDeadline] = useState<Date | undefined>();
   const [subscribersOnly, setSubscribersOnly] = useState(false);
+  const [challengeType, setChallengeType] = useState<"numeric" | "streak">("numeric");
+  const [pin, setPin] = useState("");
 
   const dateLocale = lang === "ru" ? ru : lang === "de" ? de : enUS;
+  const isStreak = challengeType === "streak";
 
   const reset = () => {
     setTitle(""); setEmoji(""); setUnit("reps"); setGoal(""); setDeadline(undefined); setSubscribersOnly(false);
+    setChallengeType("numeric"); setPin("");
   };
 
   const schema = z.object({
@@ -54,11 +58,19 @@ export const CreateChallengeDialog = ({
       toast.error(t("cc.adminOnly"));
       return;
     }
+    // Streak challenges count days, not a custom unit.
+    const effectiveUnit = isStreak ? "days" : unit;
     const parsed = schema.safeParse({
-      title, emoji, unit, goal: Number(goal), deadline,
+      title, emoji, unit: effectiveUnit, goal: Number(goal), deadline,
     });
     if (!parsed.success) {
       toast.error(parsed.error.issues[0].message);
+      return;
+    }
+    // Optional PIN (streak only): must be exactly 4 digits when provided.
+    const pinTrim = pin.trim();
+    if (isStreak && pinTrim && !/^\d{4}$/.test(pinTrim)) {
+      toast.error(t("cc.errPin"));
       return;
     }
     const days = Math.max(1, differenceInCalendarDays(startOfDay(parsed.data.deadline), startOfDay(new Date())));
@@ -70,6 +82,8 @@ export const CreateChallengeDialog = ({
         goal: parsed.data.goal,
         daysLeft: days,
         subscribersOnly,
+        challengeType,
+        pinCode: isStreak && pinTrim ? pinTrim : undefined,
       });
       toast.success(t("cc.created"));
       reset();
@@ -93,24 +107,57 @@ export const CreateChallengeDialog = ({
             <Input id="title" placeholder={t("cc.fTitlePh")} value={title} onChange={(e) => setTitle(e.target.value)} maxLength={60} />
           </div>
 
-          <div className="grid grid-cols-[80px_1fr] gap-3">
+          <div className="space-y-1.5">
+            <Label>{t("cc.fType")}</Label>
+            <div className="grid grid-cols-2 gap-2">
+              <button
+                type="button"
+                onClick={() => setChallengeType("numeric")}
+                className={cn(
+                  "rounded-2xl border px-3 py-2.5 text-sm font-medium transition",
+                  !isStreak ? "border-primary bg-primary/10 text-foreground" : "border-border text-muted-foreground",
+                )}
+              >
+                {t("cc.typeNumeric")}
+              </button>
+              <button
+                type="button"
+                onClick={() => setChallengeType("streak")}
+                className={cn(
+                  "rounded-2xl border px-3 py-2.5 text-sm font-medium transition",
+                  isStreak ? "border-primary bg-primary/10 text-foreground" : "border-border text-muted-foreground",
+                )}
+              >
+                {t("cc.typeStreak")}
+              </button>
+            </div>
+          </div>
+
+          {isStreak ? (
             <div className="space-y-1.5">
               <Label htmlFor="emoji">{t("cc.fEmoji")}</Label>
               <Input id="emoji" placeholder="🎯" value={emoji} onChange={(e) => setEmoji(e.target.value)} maxLength={4} />
             </div>
-            <div className="space-y-1.5">
-              <Label>{t("cc.fUnit")}</Label>
-              <Select value={unit} onValueChange={setUnit}>
-                <SelectTrigger><SelectValue /></SelectTrigger>
-                <SelectContent>
-                  {UNITS.map((u) => <SelectItem key={u} value={u}>{u}</SelectItem>)}
-                </SelectContent>
-              </Select>
+          ) : (
+            <div className="grid grid-cols-[80px_1fr] gap-3">
+              <div className="space-y-1.5">
+                <Label htmlFor="emoji">{t("cc.fEmoji")}</Label>
+                <Input id="emoji" placeholder="🎯" value={emoji} onChange={(e) => setEmoji(e.target.value)} maxLength={4} />
+              </div>
+              <div className="space-y-1.5">
+                <Label>{t("cc.fUnit")}</Label>
+                <Select value={unit} onValueChange={setUnit}>
+                  <SelectTrigger><SelectValue /></SelectTrigger>
+                  <SelectContent>
+                    {UNITS.map((u) => <SelectItem key={u} value={u}>{u}</SelectItem>)}
+                  </SelectContent>
+                </Select>
+              </div>
             </div>
-          </div>
+          )}
 
           <div className="space-y-1.5">
-            <Label htmlFor="goal">{t("cc.fGoal", { unit })}</Label>
+            <Label htmlFor="goal">{isStreak ? t("cc.fGoalDays") : t("cc.fGoal", { unit })}</Label>
             <Input id="goal" type="number" inputMode="numeric" min={1} placeholder={t("cc.fGoalPh")} value={goal} onChange={(e) => setGoal(e.target.value)} />
           </div>
 
@@ -140,6 +187,21 @@ export const CreateChallengeDialog = ({
               </PopoverContent>
             </Popover>
           </div>
+
+          {isStreak && (
+            <div className="space-y-1.5">
+              <Label htmlFor="pin">{t("cc.fPin")}</Label>
+              <Input
+                id="pin"
+                inputMode="numeric"
+                maxLength={4}
+                placeholder={t("cc.fPinPh")}
+                value={pin}
+                onChange={(e) => setPin(e.target.value.replace(/\D/g, "").slice(0, 4))}
+              />
+              <p className="text-xs text-muted-foreground">{t("cc.fPinDesc")}</p>
+            </div>
+          )}
 
           <div className="flex items-center justify-between rounded-2xl border border-border px-4 py-3">
             <div>

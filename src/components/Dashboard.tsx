@@ -6,15 +6,36 @@ import { Button } from "@/components/ui/button";
 import { toast } from "sonner";
 import { useEffect, useState } from "react";
 import { CreateChallengeDialog } from "./CreateChallengeDialog";
+import { PinEntryDialog } from "./PinEntryDialog";
+import type { Challenge } from "@/data/challenges";
 import { supabase } from "@/integrations/supabase/client";
 
 export const Dashboard = () => {
   const { challenges, challengesReady, setSelectedId, joinChallenge, isAdmin, auth } = useApp();
   const { t } = useI18n();
   const [createOpen, setCreateOpen] = useState(false);
+  const [pinTarget, setPinTarget] = useState<Challenge | null>(null);
   const [profile, setProfile] = useState<{ first_name?: string | null; username?: string | null; photo_url?: string | null; email?: string | null } | null>(null);
   const mine = challenges.filter((c) => c.joined);
   const available = challenges.filter((c) => !c.joined);
+
+  const joinWithToast = async (c: Challenge) => {
+    try {
+      await joinChallenge(c.id);
+      toast.success(t("dash.joined", { title: c.title }));
+    } catch (e) {
+      toast.error(e instanceof Error ? e.message : "Failed");
+    }
+  };
+
+  // PIN-protected challenges open the PIN gate first; the rest join directly.
+  const requestJoin = (c: Challenge) => {
+    if (c.pinProtected) {
+      setPinTarget(c);
+      return;
+    }
+    void joinWithToast(c);
+  };
 
   useEffect(() => {
     if (auth.status !== "authenticated") {
@@ -121,14 +142,7 @@ export const Dashboard = () => {
               key={c.id}
               c={c}
               onClick={() => setSelectedId(c.id)}
-              onJoin={async () => {
-                try {
-                  await joinChallenge(c.id);
-                  toast.success(t("dash.joined", { title: c.title }));
-                } catch (e) {
-                  toast.error(e instanceof Error ? e.message : "Failed");
-                }
-              }}
+              onJoin={() => requestJoin(c)}
             />
           ))}
         </div>
@@ -147,6 +161,19 @@ export const Dashboard = () => {
           <CreateChallengeDialog open={createOpen} onOpenChange={setCreateOpen} />
         </>
       )}
+
+      <PinEntryDialog
+        challengeId={pinTarget?.id ?? null}
+        open={!!pinTarget}
+        onOpenChange={(v) => { if (!v) setPinTarget(null); }}
+        onVerified={async () => {
+          if (pinTarget) {
+            const target = pinTarget;
+            setPinTarget(null);
+            await joinWithToast(target);
+          }
+        }}
+      />
     </div>
   );
 };

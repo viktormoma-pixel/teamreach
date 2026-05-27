@@ -11,6 +11,7 @@ import Privacy from "./pages/Privacy.tsx";
 import Impressum from "./pages/Impressum.tsx";
 import Contact from "./pages/Contact.tsx";
 import ChallengePage from "./pages/ChallengePage.tsx";
+import AuroxAICardStudio from "./pages/AuroxAICardStudio.tsx";
 
 const queryClient = new QueryClient();
 
@@ -30,6 +31,7 @@ const App = () => (
             <Route path="/privacy" element={<Privacy />} />
             <Route path="/impressum" element={<Impressum />} />
             <Route path="/contact" element={<Contact />} />
+            <Route path="/aurox-ai-card-studio" element={<AuroxAICardStudio />} />
             {/* ADD ALL CUSTOM ROUTES ABOVE THE CATCH-ALL "*" ROUTE */}
             <Route path="*" element={<NotFound />} />
           </Routes>

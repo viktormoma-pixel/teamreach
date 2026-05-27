@@ -2,6 +2,7 @@ import { createContext, useContext, useEffect, useState, useCallback, useRef, Re
 import { supabase } from "@/integrations/supabase/client";
 import type { Challenge, Participant } from "@/data/challenges";
 import { mixpanel } from "@/lib/mixpanel";
+import * as amplitude from "@amplitude/unified";
 
 type Tab = "home" | "leaderboard" | "settings";
 
@@ -13,6 +14,10 @@ export type NewChallengeInput = {
   daysLeft: number;
   surface?: Challenge["surface"];
   subscribersOnly?: boolean;
+  /** "numeric" (default) or "streak" (check off days). */
+  challengeType?: "numeric" | "streak";
+  /** Optional admin PIN; when set, joining requires entering it. */
+  pinCode?: string;
 };
 
 type AuthState =
@@ -37,6 +42,10 @@ type AppContextValue = {
   challengesReady: boolean;
   refresh: () => Promise<void>;
   addProgress: (id: string, amount: number) => Promise<void>;
+  /** Toggle a single day's check-off for a streak challenge (ISO YYYY-MM-DD). */
+  toggleDayCheck: (id: string, date: string) => Promise<void>;
+  /** Verify a challenge PIN. Returns true if open (no PIN) or PIN matches. */
+  verifyPin: (id: string, pin: string) => Promise<boolean>;
   joinChallenge: (id: string) => Promise<void>;
   createChallenge: (input: NewChallengeInput) => Promise<void>;
   deleteChallenge: (id: string) => Promise<void>;
@@ -134,7 +143,9 @@ export const AppProvider = ({ children }: { children: ReactNode }) => {
 
       const { data: chs, error: chErr } = await supabase
         .from("challenges")
-        .select("*")
+        // Explicit columns: pin_hash has column-level SELECT revoked, so "*"
+        // would error. pin_protected is the safe boolean clients can read.
+        .select("id,title,emoji,unit,goal,deadline,surface,created_by,created_at,updated_at,archived_at,subscribers_only,challenge_type,pin_protected")
         .order("created_at", { ascending: false });
       if (chErr) console.error("[TeamReach] challenges fetch failed:", chErr);
       if (!isLatest()) return;
@@ -146,9 +157,10 @@ export const AppProvider = ({ children }: { children: ReactNode }) => {
       const ids = chs.map((c) => c.id);
       const safeIds = ids.length ? ids : ["00000000-0000-0000-0000-000000000000"];
 
-      const [{ data: parts }, { data: progress }, { data: profiles }] = await Promise.all([
+      const [{ data: parts }, { data: progress }, { data: dayChecks }, { data: profiles }] = await Promise.all([
         supabase.from("challenge_participants").select("challenge_id,user_id").in("challenge_id", safeIds),
         supabase.from("progress_entries").select("challenge_id,user_id,amount,day,created_at").in("challenge_id", safeIds),
+        supabase.from("day_checks").select("challenge_id,user_id,checked_date").in("challenge_id", safeIds),
         supabase.from("profiles").select("id,first_name,username,photo_url"),
       ]);
 
@@ -158,11 +170,21 @@ export const AppProvider = ({ children }: { children: ReactNode }) => {
         const cParts = (parts ?? []).filter((p) => p.challenge_id === c.id);
         const cProgress = (progress ?? []).filter((p) => p.challenge_id === c.id);
 
+        const isStreak = (c as { challenge_type?: string }).challenge_type === "streak";
+
+        // Per-user value: streak counts checked days, numeric sums amounts.
         const totals = new Map<string, number>();
-        for (const p of cProgress) totals.set(p.user_id, (totals.get(p.user_id) ?? 0) + p.amount);
+        if (isStreak) {
+          const cDayChecks = (dayChecks ?? []).filter((d) => d.challenge_id === c.id);
+          for (const d of cDayChecks) totals.set(d.user_id, (totals.get(d.user_id) ?? 0) + 1);
+        } else {
+          for (const p of cProgress) totals.set(p.user_id, (totals.get(p.user_id) ?? 0) + p.amount);
+        }
 
         const myTotal = totals.get(me) ?? 0;
-        const totalAll = cProgress.reduce((s, p) => s + p.amount, 0);
+        const totalAll = isStreak
+          ? (dayChecks ?? []).filter((d) => d.challenge_id === c.id).length
+          : cProgress.reduce((s, p) => s + p.amount, 0);
 
         const participants: Participant[] = cParts
           .filter((p) => p.user_id !== me)
@@ -176,6 +198,12 @@ export const AppProvider = ({ children }: { children: ReactNode }) => {
           });
 
         const myEntries = cProgress.filter((p) => p.user_id === me);
+        const myCheckedDays = isStreak
+          ? (dayChecks ?? [])
+              .filter((d) => d.challenge_id === c.id && d.user_id === me)
+              .map((d) => d.checked_date)
+              .sort()
+          : undefined;
 
         return {
           id: c.id,
@@ -190,8 +218,11 @@ export const AppProvider = ({ children }: { children: ReactNode }) => {
           joined: cParts.some((p) => p.user_id === me),
           members: cParts.length,
           subscribersOnly: (c as { subscribers_only?: boolean }).subscribers_only ?? false,
-          history: buildHistory(myEntries),
+          history: isStreak ? [] : buildHistory(myEntries),
           participants,
+          type: isStreak ? "streak" : "numeric",
+          pinProtected: (c as { pin_protected?: boolean }).pin_protected ?? false,
+          checkedDays: myCheckedDays,
         };
       });
 
@@ -211,6 +242,7 @@ export const AppProvider = ({ children }: { children: ReactNode }) => {
     const { error } = await supabase.auth.signInWithPassword({ email, password });
     if (error) throw error;
     mixpanel.track("signed_in", { method: "email" });
+    amplitude.track("User Signed In", { method: "email" });
     // onAuthStateChange (SIGNED_IN) will update auth state, admin, and challenges
   }, []);
 
@@ -224,8 +256,11 @@ export const AppProvider = ({ children }: { children: ReactNode }) => {
     }
     // Identify before tracking so sign_up_completed is attributed to this user
     mixpanel.identify(data.session.user.id);
-    mixpanel.people.set({ $email: email, $created: new Date().toISOString() });
+    mixpanel.people.set({ $created: new Date().toISOString() });
     mixpanel.track("sign_up_completed", { sign_up_method: "email" });
+    amplitude.setUserId(data.session.user.id);
+    amplitude.identify(new amplitude.Identify().set("signup_method", "email"));
+    amplitude.track("Sign Up Completed", { method: "email" });
     // Session returned → SIGNED_IN event fires and handles the rest
   }, []);
 
@@ -266,6 +301,7 @@ export const AppProvider = ({ children }: { children: ReactNode }) => {
     if (error) throw error;
 
     mixpanel.track("signed_in", { method: "telegram" });
+    amplitude.track("User Signed In", { method: "telegram" });
     // onAuthStateChange (SIGNED_IN) will update auth state and load challenges
   }, []);
 
@@ -324,6 +360,7 @@ export const AppProvider = ({ children }: { children: ReactNode }) => {
         setAuth({ status: "authenticated", userId: session.user.id });
         mixpanel.identify(session.user.id);
         mixpanel.people.set({ $email: session.user.email });
+        amplitude.setUserId(session.user.id);
         setChallengesReady(false);
         try {
           await refreshAdmin(session.user.id);
@@ -364,6 +401,8 @@ export const AppProvider = ({ children }: { children: ReactNode }) => {
         setChallenges([]);
         setChallengesReady(false);
         mixpanel.reset();
+        amplitude.track("User Signed Out");
+        amplitude.reset();
       }
     });
 
@@ -392,7 +431,43 @@ export const AppProvider = ({ children }: { children: ReactNode }) => {
       throw error;
     }
     mixpanel.track("progress_logged", { challenge_id: id, amount });
+    amplitude.track("Progress Logged", { challenge_id: id, amount });
     await refresh();
+  };
+
+  // Toggle a streak day check-off. Optimistic-free: just write then refresh,
+  // mirroring addProgress so the per-user/total counts stay authoritative.
+  const toggleDayCheck = async (id: string, date: string) => {
+    const { data: { user } } = await supabase.auth.getUser();
+    if (!user) return;
+    const already = challenges.find((c) => c.id === id)?.checkedDays?.includes(date);
+    if (already) {
+      const { error } = await supabase
+        .from("day_checks")
+        .delete()
+        .eq("challenge_id", id)
+        .eq("user_id", user.id)
+        .eq("checked_date", date);
+      if (error) throw error;
+    } else {
+      const { error } = await supabase
+        .from("day_checks")
+        .insert({ challenge_id: id, user_id: user.id, checked_date: date });
+      if (error && !String(error.message).includes("duplicate")) throw error;
+    }
+    mixpanel.track("day_checked", { challenge_id: id, checked: !already });
+    amplitude.track("Day Checked", { challenge_id: id, checked: !already });
+    await refresh();
+  };
+
+  // Verify a challenge PIN server-side. Open challenges (no PIN) return true.
+  const verifyPin = async (id: string, pin: string) => {
+    const { data, error } = await supabase.rpc("verify_challenge_pin", {
+      _challenge_id: id,
+      _pin: pin,
+    });
+    if (error) throw error;
+    return data === true;
   };
 
   const joinChallenge = async (id: string) => {
@@ -422,7 +497,10 @@ export const AppProvider = ({ children }: { children: ReactNode }) => {
       }
       throw error;
     }
-    if (!alreadyJoined) mixpanel.track("challenge_joined", { challenge_id: id });
+    if (!alreadyJoined) {
+      mixpanel.track("challenge_joined", { challenge_id: id });
+      amplitude.track("Challenge Joined", { challenge_id: id });
+    }
     await refresh();
   };
 
@@ -442,14 +520,22 @@ export const AppProvider = ({ children }: { children: ReactNode }) => {
       surface,
       created_by: user.id,
       subscribers_only: input.subscribersOnly ?? false,
+      challenge_type: input.challengeType ?? "numeric",
     }).select("id").single();
     if (error) throw error;
 
     // Auto-join creator
     if (ch?.id) {
       await supabase.from("challenge_participants").insert({ challenge_id: ch.id, user_id: user.id });
+      // Set the PIN server-side (hashed) when the admin provided one.
+      const pin = input.pinCode?.trim();
+      if (pin) {
+        const { error: pinErr } = await supabase.rpc("set_challenge_pin", { _challenge_id: ch.id, _pin: pin });
+        if (pinErr) throw pinErr;
+      }
     }
     mixpanel.track("challenge_created", { unit: input.unit, goal: input.goal, days: input.daysLeft });
+    amplitude.track("Challenge Created", { unit: input.unit, goal: input.goal, days: input.daysLeft, subscribers_only: input.subscribersOnly ?? false, challenge_type: input.challengeType ?? "numeric", pin_protected: !!input.pinCode?.trim() });
     await refresh();
   };
 
@@ -460,6 +546,7 @@ export const AppProvider = ({ children }: { children: ReactNode }) => {
     const { error } = await supabase.rpc("archive_challenge", { _id: id });
     if (error) throw error;
     mixpanel.track("challenge_deleted", { challenge_id: id });
+    amplitude.track("Challenge Deleted", { challenge_id: id });
     setSelectedId(null);
     await refresh();
   };
@@ -482,7 +569,7 @@ export const AppProvider = ({ children }: { children: ReactNode }) => {
         passwordRecovery, exitPasswordRecovery, signOut, signInWithTelegram,
         onboarded, setOnboarded,
         challenges, challengesReady, refresh,
-        addProgress, joinChallenge, createChallenge, deleteChallenge,
+        addProgress, toggleDayCheck, verifyPin, joinChallenge, createChallenge, deleteChallenge,
         selectedId, setSelectedId, tab, setTab,
         resetAll, isAdmin, setIsAdmin,
       }}
