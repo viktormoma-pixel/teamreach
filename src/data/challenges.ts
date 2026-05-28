@@ -24,6 +24,10 @@ export type Challenge = {
   type?: "numeric" | "streak";
   /** ISO date strings (YYYY-MM-DD) the current user has checked off. Streak only. */
   checkedDays?: string[];
+  /** Streak window start (ISO YYYY-MM-DD). Streak only; the grid spans startDate..endDate. */
+  startDate?: string;
+  /** Streak window end = deadline (ISO YYYY-MM-DD). Streak only. */
+  endDate?: string;
   /** True when an admin set a PIN; joining requires entering it. */
   pinProtected?: boolean;
 };

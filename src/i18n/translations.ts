@@ -191,6 +191,8 @@ export const translations: Record<Lang, Dict> = {
     "cc.fPinPh": "e.g. 1234",
     "cc.fPinDesc": "Members must enter this 4-digit PIN to join.",
     "cc.errPin": "PIN must be 4 digits",
+    "cc.fStartDate": "Start date",
+    "cc.errStartAfterEnd": "Start must be on or before the deadline",
 
     // Streak challenges
     "streak.daysUnit": "days",
@@ -393,6 +395,8 @@ export const translations: Record<Lang, Dict> = {
     "cc.fPinPh": "напр. 1234",
     "cc.fPinDesc": "Чтобы присоединиться, участники вводят этот 4-значный PIN-код.",
     "cc.errPin": "PIN-код должен состоять из 4 цифр",
+    "cc.fStartDate": "Дата начала",
+    "cc.errStartAfterEnd": "Начало должно быть не позже дедлайна",
 
     // Streak challenges
     "streak.daysUnit": "дн.",
@@ -595,6 +599,8 @@ export const translations: Record<Lang, Dict> = {
     "cc.fPinPh": "z. B. 1234",
     "cc.fPinDesc": "Mitglieder müssen diese 4-stellige PIN eingeben, um beizutreten.",
     "cc.errPin": "PIN muss 4 Ziffern haben",
+    "cc.fStartDate": "Startdatum",
+    "cc.errStartAfterEnd": "Start muss am oder vor dem Stichtag liegen",
 
     // Streak challenges
     "streak.daysUnit": "Tage",

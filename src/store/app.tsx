@@ -16,6 +16,8 @@ export type NewChallengeInput = {
   subscribersOnly?: boolean;
   /** "numeric" (default) or "streak" (check off days). */
   challengeType?: "numeric" | "streak";
+  /** Streak window start (ISO YYYY-MM-DD). Defaults to today server-side when unset. */
+  startDate?: string;
   /** Optional admin PIN; when set, joining requires entering it. */
   pinCode?: string;
 };
@@ -145,7 +147,7 @@ export const AppProvider = ({ children }: { children: ReactNode }) => {
         .from("challenges")
         // Explicit columns: pin_hash has column-level SELECT revoked, so "*"
         // would error. pin_protected is the safe boolean clients can read.
-        .select("id,title,emoji,unit,goal,deadline,surface,created_by,created_at,updated_at,archived_at,subscribers_only,challenge_type,pin_protected")
+        .select("id,title,emoji,unit,goal,deadline,starts_at,surface,created_by,created_at,updated_at,archived_at,subscribers_only,challenge_type,pin_protected")
         .order("created_at", { ascending: false });
       if (chErr) console.error("[TeamReach] challenges fetch failed:", chErr);
       if (!isLatest()) return;
@@ -223,6 +225,12 @@ export const AppProvider = ({ children }: { children: ReactNode }) => {
           type: isStreak ? "streak" : "numeric",
           pinProtected: (c as { pin_protected?: boolean }).pin_protected ?? false,
           checkedDays: myCheckedDays,
+          // Streak window: admin-chosen start (falls back to creation day for
+          // legacy rows) through the deadline. Both come back as YYYY-MM-DD.
+          startDate: isStreak
+            ? ((c as { starts_at?: string | null }).starts_at ?? c.created_at)?.slice(0, 10)
+            : undefined,
+          endDate: isStreak ? c.deadline : undefined,
         };
       });
 
@@ -517,6 +525,7 @@ export const AppProvider = ({ children }: { children: ReactNode }) => {
       unit: input.unit,
       goal: input.goal,
       deadline: deadline.toISOString().slice(0, 10),
+      starts_at: input.challengeType === "streak" ? (input.startDate ?? null) : null,
       surface,
       created_by: user.id,
       subscribers_only: input.subscribersOnly ?? false,

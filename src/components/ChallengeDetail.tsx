@@ -8,7 +8,7 @@ import { ArrowLeft, Flame, Users, Calendar, Trash2, Loader2, Share2, Check } fro
 import { toast } from "sonner";
 import { ParticipantsRanking } from "./ParticipantsRanking";
 import { PinEntryDialog } from "./PinEntryDialog";
-import { lastNDays, currentStreak, todayISO } from "@/lib/streak";
+import { lastNDays, daysBetween, currentStreak, todayISO } from "@/lib/streak";
 import { ru, de, enUS } from "date-fns/locale";
 import { format } from "date-fns";
 import {
@@ -72,6 +72,10 @@ export const ChallengeDetail = () => {
   if (!c) return null;
   const pct = Math.round((c.current / c.goal) * 100);
   const maxBar = Math.max(...c.history.map((h) => h.value), 1);
+  // Streak grid spans the admin-chosen window; legacy rows without a window
+  // fall back to the trailing 14 days.
+  const streakDays =
+    c.startDate && c.endDate ? daysBetween(c.startDate, c.endDate) : lastNDays(14);
 
   const shareChallenge = async () => {
     const url = `${window.location.origin}/challenge/${c.id}`;
@@ -225,13 +229,16 @@ export const ChallengeDetail = () => {
             </div>
             <p className="text-xs text-muted-foreground mb-4">{t("streak.markDesc")}</p>
             <div className="grid grid-cols-7 gap-2">
-              {lastNDays(14).map((d) => {
+              {streakDays.map((d) => {
                 const done = c.checkedDays?.includes(d);
                 const isToday = d === todayISO();
+                // Future days can't be checked off yet.
+                const isFuture = d > todayISO();
                 return (
                   <button
                     key={d}
                     onClick={() => void toggleDay(d)}
+                    disabled={isFuture}
                     aria-pressed={done}
                     aria-label={format(new Date(d), "PPP", { locale: dateLocale })}
                     className={[
@@ -240,6 +247,7 @@ export const ChallengeDetail = () => {
                         ? "bg-gradient-primary text-primary-foreground border-transparent"
                         : "bg-secondary text-muted-foreground border-border",
                       isToday && !done ? "ring-2 ring-primary/60" : "",
+                      isFuture ? "opacity-40 cursor-not-allowed active:scale-100" : "",
                     ].join(" ")}
                   >
                     {done ? (

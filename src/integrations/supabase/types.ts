@@ -55,6 +55,7 @@ export type Database = {
           id: string
           pin_hash: string | null
           pin_protected: boolean | null
+          starts_at: string | null
           subscribers_only: boolean
           surface: string
           title: string
@@ -72,6 +73,7 @@ export type Database = {
           id?: string
           pin_hash?: string | null
           pin_protected?: boolean | null
+          starts_at?: string | null
           subscribers_only?: boolean
           surface?: string
           title: string
@@ -89,6 +91,7 @@ export type Database = {
           id?: string
           pin_hash?: string | null
           pin_protected?: boolean | null
+          starts_at?: string | null
           subscribers_only?: boolean
           surface?: string
           title?: string

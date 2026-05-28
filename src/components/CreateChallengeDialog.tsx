@@ -10,6 +10,7 @@ import { useApp } from "@/store/app";
 import { useI18n } from "@/i18n";
 import { toast } from "sonner";
 import { format, differenceInCalendarDays, startOfDay } from "date-fns";
+import { toISO } from "@/lib/streak";
 import { ru, de, enUS } from "date-fns/locale";
 import { Calendar } from "@/components/ui/calendar";
 import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover";
@@ -32,6 +33,7 @@ export const CreateChallengeDialog = ({
   const [unit, setUnit] = useState("reps");
   const [goal, setGoal] = useState("");
   const [deadline, setDeadline] = useState<Date | undefined>();
+  const [startDate, setStartDate] = useState<Date>(() => startOfDay(new Date()));
   const [subscribersOnly, setSubscribersOnly] = useState(false);
   const [challengeType, setChallengeType] = useState<"numeric" | "streak">("numeric");
   const [pin, setPin] = useState("");
@@ -40,7 +42,7 @@ export const CreateChallengeDialog = ({
   const isStreak = challengeType === "streak";
 
   const reset = () => {
-    setTitle(""); setEmoji(""); setUnit("reps"); setGoal(""); setDeadline(undefined); setSubscribersOnly(false);
+    setTitle(""); setEmoji(""); setUnit("reps"); setGoal(""); setDeadline(undefined); setStartDate(startOfDay(new Date())); setSubscribersOnly(false);
     setChallengeType("numeric"); setPin("");
   };
 
@@ -73,6 +75,11 @@ export const CreateChallengeDialog = ({
       toast.error(t("cc.errPin"));
       return;
     }
+    // Streak window starts on the admin-chosen day; it must not be after the end.
+    if (isStreak && startOfDay(startDate) > startOfDay(parsed.data.deadline)) {
+      toast.error(t("cc.errStartAfterEnd"));
+      return;
+    }
     const days = Math.max(1, differenceInCalendarDays(startOfDay(parsed.data.deadline), startOfDay(new Date())));
     try {
       await createChallenge({
@@ -83,6 +90,7 @@ export const CreateChallengeDialog = ({
         daysLeft: days,
         subscribersOnly,
         challengeType,
+        startDate: isStreak ? toISO(startDate) : undefined,
         pinCode: isStreak && pinTrim ? pinTrim : undefined,
       });
       toast.success(t("cc.created"));
@@ -161,6 +169,35 @@ export const CreateChallengeDialog = ({
             <Input id="goal" type="number" inputMode="numeric" min={1} placeholder={t("cc.fGoalPh")} value={goal} onChange={(e) => setGoal(e.target.value)} />
           </div>
 
+          {isStreak && (
+            <div className="space-y-1.5">
+              <Label>{t("cc.fStartDate")}</Label>
+              <Popover>
+                <PopoverTrigger asChild>
+                  <Button
+                    type="button"
+                    variant="outline"
+                    className="w-full justify-start text-left font-normal"
+                  >
+                    <CalendarIcon className="mr-2 h-4 w-4" />
+                    {format(startDate, "PPP", { locale: dateLocale })}
+                  </Button>
+                </PopoverTrigger>
+                <PopoverContent className="w-auto p-0" align="start">
+                  <Calendar
+                    mode="single"
+                    selected={startDate}
+                    onSelect={(d) => d && setStartDate(startOfDay(d))}
+                    disabled={(d) => d < startOfDay(new Date())}
+                    initialFocus
+                    locale={dateLocale}
+                    className={cn("p-3 pointer-events-auto")}
+                  />
+                </PopoverContent>
+              </Popover>
+            </div>
+          )}
+
           <div className="space-y-1.5">
             <Label>{t("cc.fDeadline")}</Label>
             <Popover>
@@ -179,7 +216,7 @@ export const CreateChallengeDialog = ({
                   mode="single"
                   selected={deadline}
                   onSelect={setDeadline}
-                  disabled={(d) => d < startOfDay(new Date())}
+                  disabled={(d) => d < startOfDay(isStreak ? startDate : new Date())}
                   initialFocus
                   locale={dateLocale}
                   className={cn("p-3 pointer-events-auto")}
